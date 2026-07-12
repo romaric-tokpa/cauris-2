@@ -230,6 +230,27 @@ for o in july_new:
         reattrib += 1
 
 _live = simulate_live(accounts, july_new)
+
+# Régularisation cash (choix utilisateur) : la sur-dépense en espèces de juillet
+# est couverte par un retrait du Coffre Fonds d'urgence vers les espèces (via Djamo).
+cash_live = _live.get("Cash (espèces)", 0)
+if cash_live < 0:
+    manque = num(round(-cash_live, 2))
+    july_new.append({
+        "date": "05/07",
+        "lib": "Retrait Fonds d'urgence → espèces (régularisation)",
+        "type": "virement",
+        "compte": "Coffre Fonds d'urgence",
+        "compteDest": "Cash (espèces)",
+        "cat": "",
+        "montant": manque,
+        "note": "Couvre la sur-dépense cash de juillet (retrait de l'épargne d'urgence via Djamo)",
+        "_ts": 1_760_000_100_000,
+        "_t": "",
+    })
+    _live = simulate_live(accounts, july_new)
+    print(f"[régularisation] retrait Fonds d'urgence -> espèces : {manque} F")
+
 for a in accounts:
     a["solde_live"] = _live[a["nom"]]
 
