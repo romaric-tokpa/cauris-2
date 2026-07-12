@@ -76,6 +76,9 @@
   function parseDate(d){ const m=(d||'').match(/(\d+)\/(\d+)/); return m? (+m[2])*100+(+m[1]) : 0; }
   function dayOfWeek(dd,mm,year){ const dows=['DIM','LUN','MAR','MER','JEU','VEN','SAM']; const dt=new Date(year, parseInt(mm,10)-1, parseInt(dd,10)); return dows[dt.getDay()]; }
   function hhmm(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+  /* Date par défaut d'une nouvelle opération = date du jour, dans le mois du cycle
+     actif (JJ/MM). L'utilisateur peut la modifier dans le formulaire. */
+  function defaultOpDate(){ return String(new Date().getDate()).padStart(2,'0')+'/'+M.mm; }
   function feeFor(acct){ const a=(acct||'').toLowerCase(); if(/orange money|\bom\b|wave/.test(a)) return 50; return 0; }
   function normName(s){ return (s||'').toLowerCase().replace(/coffre|\(.*?\)/g,'').replace(/[^a-zàâçéèêëîïôûùüÿñæœ' ]/g,'').trim(); }
 
@@ -391,8 +394,7 @@
       if(kind==='n') o=newOps[idx];
       else o=(opOverrides&&opOverrides[idx]) || archivedOps()[idx];
     }
-    const defDay=M.seed? S.asOf.split(' ')[0] : '01';
-    document.getElementById('fDate').value=o?o.date:defDay+'/'+M.mm;
+    document.getElementById('fDate').value=o?o.date:defaultOpDate();
     document.getElementById('fLib').value=o?o.lib:'';
     document.getElementById('fType').value=o?o.type:'dépense';
     document.getElementById('fCompte').value=o?o.compte:baseComptes()[0].nom;
@@ -513,7 +515,7 @@
     document.getElementById('xFrom').innerHTML=opts;
     document.getElementById('xRecu').innerHTML='<option value="">— aucune —</option>'+opts;
     document.getElementById('xFraisSur').innerHTML='<option value="">auto</option>'+opts;
-    document.getElementById('xDate').value=(M.seed?S.asOf.split(' ')[0]:'01')+'/'+M.mm;
+    document.getElementById('xDate').value=defaultOpDate();
     ['xLib','xCout','xTendu','xFrais','xEcheance'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('xCat').value=''; document.getElementById('xCatCustom').value=''; document.getElementById('xCatCustom').style.display='none';
     document.getElementById('xDette').checked=false; document.getElementById('xEchWrap').style.display='none';
@@ -758,7 +760,7 @@
     document.getElementById('ventForm').classList.add('open'); ventEditId=id||null;
     const v=id?ventilations.find(x=>x.id===id):null;
     document.getElementById('vfLabel').value=v?v.label:'';
-    document.getElementById('vfDate').value=v?v.date:('01/'+M.mm);
+    document.getElementById('vfDate').value=v?v.date:defaultOpDate();
     document.getElementById('vfMontant').value=v?v.montant:'';
     document.getElementById('vfFromRev').value='';
     document.getElementById('ventFormTitle').textContent=id?'Modifier la ventilation':'Nouvelle ventilation';
