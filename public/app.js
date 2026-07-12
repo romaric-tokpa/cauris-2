@@ -79,7 +79,6 @@
   /* Date par défaut d'une nouvelle opération = date du jour, dans le mois du cycle
      actif (JJ/MM). L'utilisateur peut la modifier dans le formulaire. */
   function defaultOpDate(){ return String(new Date().getDate()).padStart(2,'0')+'/'+M.mm; }
-  function feeFor(acct){ const a=(acct||'').toLowerCase(); if(/orange money|\bom\b|wave/.test(a)) return 50; return 0; }
   function normName(s){ return (s||'').toLowerCase().replace(/coffre|\(.*?\)/g,'').replace(/[^a-zàâçéèêëîïôûùüÿñæœ' ]/g,'').trim(); }
 
   /* ---------- corrections sur les opérations archivées (modif./suppr.) ---------- */
@@ -405,7 +404,7 @@
       else { sel.value=''; document.getElementById('fCatCustom').style.display='none'; }
     } else { document.getElementById('fCat').value=''; document.getElementById('fCatCustom').style.display='none'; document.getElementById('fCatCustom').value=''; }
     document.getElementById('fMontant').value=o?Math.abs(o.montant):'';
-    document.getElementById('fFrais').value=(editIdx!=null)?'':(feeFor(baseComptes()[0].nom)||'');
+    document.getElementById('fFrais').value='';
     document.getElementById('fNote').value=o?(o.note||''):'';
     document.getElementById('fCompteDest').value=o&&o.compteDest?o.compteDest:'';
     document.getElementById('formTitle').textContent=(editIdx!=null)?(editIdx[0]==='a'?'Modifier l’opération importée':'Modifier l’opération'):'Nouvelle opération';
@@ -420,7 +419,7 @@
   function syncType(){ const t=document.getElementById('fType').value;
     document.getElementById('destWrap').style.display=(t==='virement')?'flex':'none';
     document.getElementById('catWrap').style.display=(t==='virement')?'none':'';
-    document.getElementById('fFraisWrap').style.display=(editIdx!=null)?'none':((t==='virement')?'':'none'); }
+    document.getElementById('fFraisWrap').style.display=(editIdx!=null)?'none':''; }
   function saveForm(){
     const date=document.getElementById('fDate').value.trim();
     const lib=document.getElementById('fLib').value.trim();
@@ -1062,7 +1061,6 @@
     document.getElementById('fSave').onclick=saveForm;
     document.getElementById('fType').onchange=syncType;
     document.querySelectorAll('#fTypeSeg .typeopt').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#fTypeSeg .typeopt').forEach(x=>x.classList.remove('active')); b.classList.add('active'); document.getElementById('fType').value=b.dataset.t; syncType(); });
-    document.getElementById('fCompte').onchange=()=>{ if(editIdx==null) document.getElementById('fFrais').value=feeFor(document.getElementById('fCompte').value)||''; };
     document.getElementById('ventAddBtn').onclick=()=>openVentForm(null);
     document.getElementById('vfCancel').onclick=closeVentForm;
     document.getElementById('vfSave').onclick=saveVentForm;
