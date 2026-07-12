@@ -1,0 +1,18 @@
+node_modules
+.next
+out
+build
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
+/data/*.db
+/data/*.db-*
+_design
+_extracted
+"Fiche candidat pré-qualification.zip"
+Fiche*.zip
+next-env.d.ts
+.vercel
+.env*

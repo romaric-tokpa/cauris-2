@@ -1,0 +1,25 @@
+{
+  "name": "cauris",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cauris — Suivi de trésorerie personnelle (MaCaisse), fullstack sur Turso",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "next": "^15.5.20",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
