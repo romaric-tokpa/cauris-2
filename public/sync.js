@@ -176,9 +176,25 @@
   function injectLogout() {
     var tabs = document.querySelector(".topbar .tabs");
     if (!tabs || document.querySelector(".cauris-logout-tab")) return;
+
+    // Lien vers la page Sauvegardes.
+    var bk = document.createElement("a");
+    bk.className = "cauris-logout-tab cauris-backups-tab";
+    bk.href = "/backups";
+    bk.title = "Sauvegardes & restauration";
+    bk.style.marginLeft = "auto";
+    bk.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      '<ellipse cx="12" cy="5" rx="8" ry="3"></ellipse>' +
+      '<path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"></path>' +
+      '<path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"></path></svg><span>Sauvegardes</span>';
+    tabs.appendChild(bk);
+
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "cauris-logout-tab";
+    btn.style.marginLeft = "2px"; // groupé avec le lien Sauvegardes (qui porte le auto)
     btn.title = "Se déconnecter";
     btn.innerHTML =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +

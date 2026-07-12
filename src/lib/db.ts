@@ -35,6 +35,14 @@ async function ensureSchema(client: Client): Promise<void> {
          key   TEXT PRIMARY KEY,
          value TEXT NOT NULL
        )`,
+      `CREATE TABLE IF NOT EXISTS backups (
+         id         INTEGER PRIMARY KEY AUTOINCREMENT,
+         user_id    TEXT NOT NULL,
+         created_at INTEGER NOT NULL,
+         kind       TEXT NOT NULL,   -- 'auto' | 'manuel' | 'pré-restauration'
+         data       TEXT NOT NULL    -- JSON { seed, seed_version, state:{key:valueJSON} }
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_backups_user_time ON backups(user_id, created_at DESC)`,
     ],
     "write",
   );
@@ -116,4 +124,128 @@ export async function putState(userId: string, key: string, value: string): Prom
 export async function deleteState(userId: string, key: string): Promise<void> {
   const db = await getDb();
   await db.execute({ sql: "DELETE FROM state WHERE user_id = ? AND key = ?", args: [userId, key] });
+}
+
+/* ============================================================
+   SAUVEGARDES (backups) — snapshot complet + restauration
+   ============================================================ */
+
+export type BackupKind = "auto" | "manuel" | "pré-restauration";
+
+/** Capture brute des données de l'utilisateur (seed global + tout son état). */
+async function snapshot(userId: string): Promise<string> {
+  const db = await getDb();
+  const meta = await db.execute("SELECT key, value FROM meta WHERE key IN ('seed','seed_version')");
+  const state = await db.execute({ sql: "SELECT key, value FROM state WHERE user_id = ?", args: [userId] });
+  const metaMap: Record<string, string> = {};
+  for (const r of meta.rows) metaMap[String(r.key)] = String(r.value);
+  const stateMap: Record<string, string> = {};
+  for (const r of state.rows) stateMap[String(r.key)] = String(r.value);
+  return JSON.stringify({
+    v: 1,
+    seed: metaMap.seed ?? null,
+    seed_version: metaMap.seed_version ?? null,
+    state: stateMap,
+  });
+}
+
+export type BackupMeta = { id: number; created_at: number; kind: string; bytes: number; cycles: number };
+
+/** Crée une sauvegarde, puis élague pour ne garder que `keep` sauvegardes 'auto'. */
+export async function createBackup(userId: string, kind: BackupKind, keepAuto = 30): Promise<BackupMeta> {
+  const db = await getDb();
+  const data = await snapshot(userId);
+  const now = Date.now();
+  const ins = await db.execute({
+    sql: "INSERT INTO backups (user_id, created_at, kind, data) VALUES (?, ?, ?, ?)",
+    args: [userId, now, kind, data],
+  });
+  const id = Number(ins.lastInsertRowid);
+  // Élagage : garder les `keepAuto` dernières 'auto' (les manuelles/pré-restauration restent).
+  await db.execute({
+    sql: `DELETE FROM backups WHERE user_id = ? AND kind = 'auto' AND id NOT IN (
+            SELECT id FROM backups WHERE user_id = ? AND kind = 'auto' ORDER BY created_at DESC LIMIT ?
+          )`,
+    args: [userId, userId, keepAuto],
+  });
+  let cycles = 0;
+  try {
+    cycles = (JSON.parse(JSON.parse(data).state?.cycles ?? "null")?.months ?? []).length;
+  } catch {
+    /* ignore */
+  }
+  return { id, created_at: now, kind, bytes: data.length, cycles };
+}
+
+/** Liste les sauvegardes (métadonnées seulement, sans le contenu). */
+export async function listBackups(userId: string): Promise<BackupMeta[]> {
+  const db = await getDb();
+  const r = await db.execute({
+    sql: "SELECT id, created_at, kind, length(data) AS bytes, data FROM backups WHERE user_id = ? ORDER BY created_at DESC",
+    args: [userId],
+  });
+  return r.rows.map((row) => {
+    let cycles = 0;
+    try {
+      cycles = (JSON.parse(JSON.parse(String(row.data)).state?.cycles ?? "null")?.months ?? []).length;
+    } catch {
+      /* ignore */
+    }
+    return {
+      id: Number(row.id),
+      created_at: Number(row.created_at),
+      kind: String(row.kind),
+      bytes: Number(row.bytes),
+      cycles,
+    };
+  });
+}
+
+/** Renvoie le contenu brut d'une sauvegarde (pour téléchargement). */
+export async function getBackupData(userId: string, id: number): Promise<string | null> {
+  const db = await getDb();
+  const r = await db.execute({
+    sql: "SELECT data FROM backups WHERE user_id = ? AND id = ?",
+    args: [userId, id],
+  });
+  return r.rows[0] ? String(r.rows[0].data) : null;
+}
+
+/** Restaure une sauvegarde : sauvegarde d'abord l'état actuel (réversible), puis écrase. */
+export async function restoreBackup(userId: string, id: number): Promise<{ ok: boolean; restoredFrom: number; safetyBackup: number } | null> {
+  const db = await getDb();
+  const raw = await getBackupData(userId, id);
+  if (!raw) return null;
+  let parsed: { seed: string | null; seed_version: string | null; state: Record<string, string> };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  // Filet de sécurité : snapshot de l'état courant avant d'écraser.
+  const safety = await createBackup(userId, "pré-restauration");
+
+  const stmts: { sql: string; args: (string | number)[] }[] = [];
+  if (parsed.seed != null) {
+    stmts.push({
+      sql: "INSERT INTO meta (key, value) VALUES ('seed', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      args: [parsed.seed],
+    });
+  }
+  if (parsed.seed_version != null) {
+    stmts.push({
+      sql: "INSERT INTO meta (key, value) VALUES ('seed_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      args: [parsed.seed_version],
+    });
+  }
+  stmts.push({ sql: "DELETE FROM state WHERE user_id = ?", args: [userId] });
+  const now = Date.now();
+  for (const [key, value] of Object.entries(parsed.state || {})) {
+    stmts.push({
+      sql: "INSERT INTO state (user_id, key, value, updated_at) VALUES (?, ?, ?, ?)",
+      args: [userId, key, value, now],
+    });
+  }
+  await db.batch(stmts, "write");
+  return { ok: true, restoredFrom: id, safetyBackup: safety.id };
 }
