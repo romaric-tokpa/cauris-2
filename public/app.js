@@ -52,11 +52,15 @@
   /* ---------- base providers (seed vs derived) ---------- */
   function baseComptes(){ return (M.seed? S.comptes : M.opening.comptes).map(c=>({...c})); }
   function baseCoffres(){ return (M.seed? S.coffres : M.opening.coffres).map(c=>({...c})); }
-  function baseCategories(){ const m={}; if(M.seed) archivedOps().forEach(o=>{ if(o.type==='dépense'){ const l=o.cat||'Divers'; m[l]=(m[l]||0)+Math.abs(o.montant); } }); return m; }
-  function baseRevCategories(){ const m={}; if(M.seed && S.revCategories) S.revCategories.forEach(x=>m[x.label]=x.value); return m; }
-  function baseDepense(){ if(!M.seed) return 0; return archivedOps().reduce((s,o)=> o.type==='dépense'? s+Math.abs(o.montant): s, 0); }
-  function baseRevenus(){ if(!M.seed) return 0; return archivedOps().reduce((s,o)=> o.type==='revenu'? s+Math.abs(o.montant): s, 0); }
-  function archivedOpsRaw(){ return M.seed? S.operations : []; }
+  function baseCategories(){ const m={}; archivedOps().forEach(o=>{ if(o.type==='dépense'){ const l=o.cat||'Divers'; m[l]=(m[l]||0)+Math.abs(o.montant); } }); return m; }
+  function baseRevCategories(){ const m={}; if(M.seed && S.revCategories){ S.revCategories.forEach(x=>m[x.label]=x.value); } else { archivedOps().forEach(o=>{ if(o.type==='revenu'){ const l=o.cat||o.lib||'Divers'; m[l]=(m[l]||0)+Math.abs(o.montant); } }); } return m; }
+  function baseDepense(){ return archivedOps().reduce((s,o)=> o.type==='dépense'? s+Math.abs(o.montant): s, 0); }
+  function baseRevenus(){ return archivedOps().reduce((s,o)=> o.type==='revenu'? s+Math.abs(o.montant): s, 0); }
+  /* Opérations importées (historique). Le seed juin vient de S.operations ; les
+     autres mois portent leur log dans meta.archive. Ces opérations n'affectent
+     PAS les soldes (soldes = comptes/opening, valeur courante partagée) ; seules
+     les nouvelles opérations saisies (newOps) font évoluer les soldes. */
+  function archivedOpsRaw(){ return M.seed? S.operations : (M.archive||[]); }
   function archivedOps(){
     const raw=archivedOpsRaw();
     return raw.map((o,i)=>{
@@ -774,7 +778,7 @@
   /* ============================================================ HISTORIQUE */
   function monthOps(meta){
     const b=loadBucket(meta.id);
-    const rawArch=meta.seed?S.operations:[];
+    const rawArch=meta.seed?S.operations:(meta.archive||[]);
     const ov=b.opOverrides||{}, del=b.opDeletes||[];
     const arch=rawArch.map((o,i)=>{ if(del.includes(i)) return null; return ov[i]?{...ov[i]}:o; }).filter(Boolean);
     return arch.concat(b.newOps||[]);

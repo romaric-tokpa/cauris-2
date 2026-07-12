@@ -229,36 +229,11 @@ for o in july_new:
         o["note"] = (note + " · source ré-attribuée à l'épargne SG").strip(" ·")
         reattrib += 1
 
+# Note : dans le modèle "solde partagé", les opérations importées de juillet sont
+# un HISTORIQUE (meta.archive) qui n'affecte PAS les soldes. Les soldes affichés
+# sont les soldes courants corrects (identiques à juin). Pas de régularisation à
+# ajouter : plus de recalcul par mois, donc plus de découvert artificiel.
 _live = simulate_live(accounts, july_new)
-
-# Régularisation (choix utilisateur) : chaque compte DISPONIBLE encore à découvert
-# en juillet (sur-dépense cash/OM) est renfloué par un retrait du Coffre Fonds
-# d'urgence (via Djamo). Rend juillet 100 % cohérent, sans découvert.
-DEST_LABELS = {"Cash (espèces)": "espèces", "Orange Money": "Orange Money"}
-_ts_reg = 1_760_000_100_000
-for a in accounts:
-    if a["type"] != "disponible":
-        continue
-    v = _live.get(a["nom"], 0)
-    if v < 0:
-        manque = num(round(-v, 2))
-        dest = a["nom"]
-        july_new.append({
-            "date": "05/07",
-            "lib": f"Retrait Fonds d'urgence → {DEST_LABELS.get(dest, dest)} (régularisation)",
-            "type": "virement",
-            "compte": "Coffre Fonds d'urgence",
-            "compteDest": dest,
-            "cat": "",
-            "montant": manque,
-            "note": "Couvre la sur-dépense de juillet (retrait de l'épargne d'urgence via Djamo)",
-            "_ts": _ts_reg,
-            "_t": "",
-        })
-        _ts_reg += 1
-        print(f"[régularisation] retrait Fonds d'urgence -> {dest} : {manque} F")
-        _live = simulate_live(accounts, july_new)
-
 for a in accounts:
     a["solde_live"] = _live[a["nom"]]
 
@@ -329,16 +304,20 @@ for i, o in enumerate(july_new):
     o["_ts"] = 1_760_000_000_000 + (N - i)
     o["_t"] = ""
 
+# Juillet : soldes d'ouverture = soldes courants corrects (identiques à juin) ;
+# les 113 opérations de juillet vivent dans meta.archive (historique, n'affecte
+# pas les soldes). newOps reste vide (les futures saisies iront dedans).
 cycles = {
     "activeId": "2026-07",
     "months": [
         {"id": "2026-06", "label": "Juin 2026", "mm": "06", "year": 2026, "monthName": "juin", "seed": True},
         {"id": "2026-07", "label": "Juillet 2026", "mm": "07", "year": 2026, "monthName": "juillet", "seed": False,
-         "opening": {"comptes": july_opening_comptes, "coffres": july_opening_coffres}},
+         "opening": {"comptes": july_opening_comptes, "coffres": july_opening_coffres},
+         "archive": july_new},
     ],
 }
 bucket_june = {"newOps": [], "dettePaid": {}, "ventilations": None, "coffreOverrides": {}, "userDettes": [], "opOverrides": {}, "opDeletes": []}
-bucket_july = {"newOps": july_new, "dettePaid": {}, "ventilations": [], "coffreOverrides": {}, "userDettes": [], "opOverrides": {}, "opDeletes": []}
+bucket_july = {"newOps": [], "dettePaid": {}, "ventilations": [], "coffreOverrides": {}, "userDettes": [], "opOverrides": {}, "opDeletes": []}
 
 state = {"cycles": cycles, "m-2026-06": bucket_june, "m-2026-07": bucket_july}
 
