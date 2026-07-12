@@ -41,7 +41,7 @@ async function ensureSchema(client: Client): Promise<void> {
 
   // On stocke le cycle d'origine (seed) dans Turso pour qu'il soit la source
   // de vérité, versionnée. On ré-écrit si la version du seed change.
-  const SEED_VERSION = "2026-06.v1";
+  const SEED_VERSION = "2026-06.v2";
   const cur = await client.execute({
     sql: "SELECT value FROM meta WHERE key = 'seed_version'",
     args: [],

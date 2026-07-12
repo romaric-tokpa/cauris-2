@@ -1,7 +1,7 @@
-// Cauris — données seed (Juin 2026), portées depuis le design (data.js).
-// Réconciliées à partir de Cauris_Suivi_juin_2026.xlsx (225 opérations).
-// Ce cycle d'origine est inséré dans Turso au premier démarrage, puis sert
-// de "window.MACAISSE" côté client (renvoyé par /api/bootstrap).
+// Cauris — données seed (Juin 2026) CORRIGÉES, importées depuis
+// "Cauris_Suivi_juin_2026_corrige (4).xlsx" (feuille Comptes = soldes fin juin,
+// Journal juin archive = 225 opérations). Remplace l'ancien seed non corrigé.
+// Régénéré via scripts/build_import.py -> build/seed.json.
 
 export type Operation = {
   date: string;
@@ -30,22 +30,22 @@ export type SeedData = {
 export const SEED: SeedData = {
   "asOf": "30 juin 2026",
   "kpis": {
-    "patrimoine": 1399602.7,
-    "disponible": 6400.7,
-    "epargne": 1393202,
-    "depenseJuin": 1195588,
-    "revenus": 1769033,
-    "epargneNette": 573445,
-    "tauxEpargne": 0.3241573221076147
+    "patrimoine": 1388922.7,
+    "disponible": 3720.7,
+    "epargne": 1385202,
+    "depenseJuin": 802275,
+    "revenus": 1770678,
+    "epargneNette": 968403,
+    "tauxEpargne": 0.5469108443206501
   },
   "patrimoineSplit": [
     {
       "label": "Disponible",
-      "value": 6400.7
+      "value": 3720.7
     },
     {
       "label": "Coffres (urgence + scolarité)",
-      "value": 708013
+      "value": 700013
     },
     {
       "label": "Épargne bloquée",
@@ -61,13 +61,13 @@ export const SEED: SeedData = {
     },
     {
       "nom": "Djamo (courant)",
-      "solde": 357,
+      "solde": 257,
       "type": "disponible",
       "note": ""
     },
     {
       "nom": "Wave",
-      "solde": 99,
+      "solde": 2619,
       "type": "disponible",
       "note": ""
     },
@@ -79,21 +79,21 @@ export const SEED: SeedData = {
     },
     {
       "nom": "Orange Money",
-      "solde": 5137.7,
+      "solde": 37.7,
       "type": "disponible",
       "note": ""
     },
     {
-      "nom": "Coffre Fonds d'urgence (Djamo)",
-      "solde": 708013,
+      "nom": "Coffre Fonds d'urgence",
+      "solde": 700013,
       "type": "épargne",
-      "note": "Non bloqué — accessible"
+      "note": ""
     },
     {
-      "nom": "Coffre Scolarité (Djamo)",
+      "nom": "Coffre Scolarité",
       "solde": 0,
       "type": "épargne",
-      "note": "À provisionner"
+      "note": ""
     },
     {
       "nom": "Épargne classique SGCI",
@@ -105,7 +105,7 @@ export const SEED: SeedData = {
       "nom": "Épargne forcée (prêt)",
       "solde": 660189,
       "type": "bloqué",
-      "note": "Récup. fin de prêt"
+      "note": ""
     }
   ],
   "categories": [
@@ -114,56 +114,44 @@ export const SEED: SeedData = {
       "value": 188358
     },
     {
-      "label": "Loyer",
-      "value": 140700
-    },
-    {
-      "label": "Transport",
-      "value": 130334
-    },
-    {
-      "label": "Famille",
-      "value": 106995
-    },
-    {
       "label": "Aide famille",
-      "value": 101000
+      "value": 123195
     },
     {
       "label": "Outils/Web",
-      "value": 100088
+      "value": 87525
+    },
+    {
+      "label": "Loyer",
+      "value": 70000
+    },
+    {
+      "label": "Transport",
+      "value": 65819
     },
     {
       "label": "Santé",
-      "value": 89425
-    },
-    {
-      "label": "Provisions",
-      "value": 56924
-    },
-    {
-      "label": "Nourriture",
-      "value": 56020
+      "value": 51365
     },
     {
       "label": "Factures",
       "value": 43114
     },
     {
-      "label": "Copine",
-      "value": 40096
-    },
-    {
-      "label": "Maison",
-      "value": 34960
+      "label": "Provisions",
+      "value": 33824
     },
     {
       "label": "Déco",
       "value": 33000
     },
     {
-      "label": "Départ sœurs",
-      "value": 16200
+      "label": "Nourriture",
+      "value": 31005
+    },
+    {
+      "label": "Copine",
+      "value": 30096
     },
     {
       "label": "Frais",
@@ -175,15 +163,7 @@ export const SEED: SeedData = {
     },
     {
       "label": "Frais de transfert",
-      "value": 9496
-    },
-    {
-      "label": "Vêtements",
-      "value": 7000
-    },
-    {
-      "label": "Autre",
-      "value": 6400
+      "value": 7496
     },
     {
       "label": "Prêt étudiant",
@@ -192,6 +172,18 @@ export const SEED: SeedData = {
     {
       "label": "Soins perso",
       "value": 3800
+    },
+    {
+      "label": "Vêtements",
+      "value": 1000
+    },
+    {
+      "label": "Maison",
+      "value": 700
+    },
+    {
+      "label": "Autre",
+      "value": 300
     }
   ],
   "revCategories": [
@@ -204,19 +196,31 @@ export const SEED: SeedData = {
       "value": 126350
     },
     {
+      "label": "Remboursement frais nourritures",
+      "value": 1000
+    },
+    {
+      "label": "Reception monnaie transport",
+      "value": 595
+    },
+    {
       "label": "Remboursement",
       "value": 260
     },
     {
       "label": "Intérêts épargne",
       "value": 116
+    },
+    {
+      "label": "Retrouve de l'argent dans mon pantalon",
+      "value": 50
     }
   ],
   "coffres": [
     {
       "nom": "Fonds d'urgence",
       "objectif": 940000,
-      "epargne": 708013,
+      "epargne": 700013,
       "bloque": false,
       "note": "Objectif = 6 mois de salaire. Priorité absolue avant tout autre projet. Bloque-le dans un coffre à terme pour le rendre intouchable."
     },
@@ -225,7 +229,7 @@ export const SEED: SeedData = {
       "objectif": 50000,
       "epargne": 0,
       "bloque": false,
-      "note": "À provisionner — 0 F versé pour l'instant."
+      "note": "À provisionner — priorité après le fonds d'urgence."
     },
     {
       "nom": "Épargne classique SGCI",
@@ -243,9 +247,9 @@ export const SEED: SeedData = {
     }
   ],
   "dettes": [],
-  "dettesNote": "Tous les engagements de juin ont été soldés : Prêt Djamo (5 239 F, réglé 26/06), et 3 reconstitutions du Fonds d'urgence — don anniversaire (5 000 F), peinture (22 385 F), nourriture (3 100 F), copine (2 000 F) — soit 37 724 F remis au coffre le 26/06. Aucune dette en cours.",
+  "dettesNote": "Tous les engagements ont été soldés au 26/06 : Prêt Djamo (crédit score) (5 239 F)  Fond urgence — don anniv (5 000 F)  Fond urgence — peinture (22 385 F)  Fond urgence — nourriture (3 100 F)  Fond urgence — copine (2 000 F) — soit 37 724 F remis. Aucune dette en cours.",
   "ventilation": {
-    "dispoAVentiler": 1769033,
+    "dispoAVentiler": 1770678,
     "charges": [
       {
         "poste": "Prêt",
@@ -254,50 +258,32 @@ export const SEED: SeedData = {
         "note": ""
       },
       {
-        "poste": "Loyer",
-        "montant": 140700,
-        "statut": "Fait",
-        "note": ""
-      },
-      {
-        "poste": "Transport",
-        "montant": 130334,
-        "statut": "Fait",
-        "note": ""
-      },
-      {
-        "poste": "Famille",
-        "montant": 106995,
-        "statut": "Fait",
-        "note": ""
-      },
-      {
         "poste": "Aide famille",
-        "montant": 101000,
+        "montant": 123195,
         "statut": "Fait",
         "note": ""
       },
       {
         "poste": "Outils/Web",
-        "montant": 100088,
+        "montant": 87525,
+        "statut": "Fait",
+        "note": ""
+      },
+      {
+        "poste": "Loyer",
+        "montant": 70000,
+        "statut": "Fait",
+        "note": ""
+      },
+      {
+        "poste": "Transport",
+        "montant": 65819,
         "statut": "Fait",
         "note": ""
       },
       {
         "poste": "Santé",
-        "montant": 89425,
-        "statut": "Fait",
-        "note": ""
-      },
-      {
-        "poste": "Provisions",
-        "montant": 56924,
-        "statut": "Fait",
-        "note": ""
-      },
-      {
-        "poste": "Nourriture",
-        "montant": 56020,
+        "montant": 51365,
         "statut": "Fait",
         "note": ""
       },
@@ -308,14 +294,8 @@ export const SEED: SeedData = {
         "note": ""
       },
       {
-        "poste": "Copine",
-        "montant": 40096,
-        "statut": "Fait",
-        "note": ""
-      },
-      {
-        "poste": "Maison",
-        "montant": 34960,
+        "poste": "Provisions",
+        "montant": 33824,
         "statut": "Fait",
         "note": ""
       },
@@ -326,8 +306,14 @@ export const SEED: SeedData = {
         "note": ""
       },
       {
-        "poste": "Départ sœurs",
-        "montant": 16200,
+        "poste": "Nourriture",
+        "montant": 31005,
+        "statut": "Fait",
+        "note": ""
+      },
+      {
+        "poste": "Copine",
+        "montant": 30096,
         "statut": "Fait",
         "note": ""
       },
@@ -345,19 +331,7 @@ export const SEED: SeedData = {
       },
       {
         "poste": "Frais de transfert",
-        "montant": 9496,
-        "statut": "Fait",
-        "note": ""
-      },
-      {
-        "poste": "Vêtements",
-        "montant": 7000,
-        "statut": "Fait",
-        "note": ""
-      },
-      {
-        "poste": "Autre",
-        "montant": 6400,
+        "montant": 7496,
         "statut": "Fait",
         "note": ""
       },
@@ -372,6 +346,24 @@ export const SEED: SeedData = {
         "montant": 3800,
         "statut": "Fait",
         "note": ""
+      },
+      {
+        "poste": "Vêtements",
+        "montant": 1000,
+        "statut": "Fait",
+        "note": ""
+      },
+      {
+        "poste": "Maison",
+        "montant": 700,
+        "statut": "Fait",
+        "note": ""
+      },
+      {
+        "poste": "Autre",
+        "montant": 300,
+        "statut": "Fait",
+        "note": ""
       }
     ],
     "resteACouvrir": [],
@@ -384,8 +376,7 @@ export const SEED: SeedData = {
       "type": "revenu",
       "compte": "Banque",
       "cat": "Salaire",
-      "montant": 934127,
-      "note": "297"
+      "montant": 934127
     },
     {
       "date": "01/06",
@@ -393,8 +384,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -100,
-      "note": "297"
+      "montant": -100
     },
     {
       "date": "01/06",
@@ -402,8 +392,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo",
       "cat": "Nourriture",
-      "montant": -2400,
-      "note": "297"
+      "montant": -2400
     },
     {
       "date": "01/06",
@@ -411,8 +400,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo",
       "cat": "Frais",
-      "montant": -20,
-      "note": "297"
+      "montant": -20
     },
     {
       "date": "01/06",
@@ -438,8 +426,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Orange Money",
       "cat": "Frais",
-      "montant": -51,
-      "note": "297"
+      "montant": -51
     },
     {
       "date": "01/06",
@@ -447,8 +434,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo",
       "cat": "Frais",
-      "montant": -10,
-      "note": "297"
+      "montant": -10
     },
     {
       "date": "01/06",
@@ -465,8 +451,42 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Banque",
       "cat": "Prêt",
-      "montant": -94179,
-      "note": "297"
+      "montant": -94179
+    },
+    {
+      "date": "01/06",
+      "lib": "Épargne forcée bloquée",
+      "type": "virement",
+      "compte": "Banque→Coffre prêt",
+      "cat": "",
+      "montant": 30000,
+      "note": "obligatoire"
+    },
+    {
+      "date": "01/06",
+      "lib": "Retrait vers courant SGBCI",
+      "type": "virement",
+      "compte": "Banque→Courant",
+      "cat": "",
+      "montant": 5100
+    },
+    {
+      "date": "01/06",
+      "lib": "Transfert OM→Djamo",
+      "type": "virement",
+      "compte": "OM→Djamo",
+      "cat": "",
+      "montant": 5100,
+      "note": "−51 frais"
+    },
+    {
+      "date": "01/06",
+      "lib": "Retrait Wave→Cash",
+      "type": "virement",
+      "compte": "Wave→Cash",
+      "cat": "",
+      "montant": 1000,
+      "note": "pour attiéké"
     },
     {
       "date": "02/06",
@@ -474,15 +494,14 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -100,
-      "note": "323"
+      "montant": -100
     },
     {
       "date": "02/06",
       "lib": "Savon (sœurs, matin)",
       "type": "dépense",
       "compte": "Cash",
-      "cat": "Famille",
+      "cat": "Aide famille",
       "montant": -500,
       "note": "espèces"
     },
@@ -492,8 +511,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -1400,
-      "note": "323"
+      "montant": -1400
     },
     {
       "date": "02/06",
@@ -515,6 +533,32 @@ export const SEED: SeedData = {
     },
     {
       "date": "02/06",
+      "lib": "Banque → Orange Money",
+      "type": "virement",
+      "compte": "Banque→OM",
+      "cat": "",
+      "montant": 5000
+    },
+    {
+      "date": "02/06",
+      "lib": "OM → Djamo",
+      "type": "virement",
+      "compte": "OM→Djamo",
+      "cat": "",
+      "montant": 5000,
+      "note": "4 950 reçus"
+    },
+    {
+      "date": "02/06",
+      "lib": "Djamo → Wave",
+      "type": "virement",
+      "compte": "Djamo→Wave",
+      "cat": "",
+      "montant": 4949,
+      "note": "4 900 reçus"
+    },
+    {
+      "date": "02/06",
       "lib": "Transport travail→maison (soir)",
       "type": "dépense",
       "compte": "Cash",
@@ -528,8 +572,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -900,
-      "note": "323"
+      "montant": -900
     },
     {
       "date": "02/06",
@@ -537,11 +580,10 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -350,
-      "note": "338"
+      "montant": -350
     },
     {
-      "date": "02/06",
+      "date": "03/06",
       "lib": "Abonnement Google AI",
       "type": "dépense",
       "compte": "Banque",
@@ -564,8 +606,16 @@ export const SEED: SeedData = {
       "type": "revenu",
       "compte": "Coffre Fonds d'urgence",
       "cat": "Intérêts épargne",
-      "montant": 116,
-      "note": "338"
+      "montant": 116
+    },
+    {
+      "date": "03/06",
+      "lib": "Banque → Orange Money",
+      "type": "virement",
+      "compte": "Banque→OM",
+      "cat": "",
+      "montant": 153214,
+      "note": "sans frais (premium)"
     },
     {
       "date": "03/06",
@@ -573,8 +623,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Orange Money",
       "cat": "Loyer",
-      "montant": -70000,
-      "note": "338"
+      "montant": -70000
     },
     {
       "date": "03/06",
@@ -591,8 +640,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Orange Money",
       "cat": "Transport",
-      "montant": -40000,
-      "note": "338"
+      "montant": -40000
     },
     {
       "date": "03/06",
@@ -609,8 +657,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Orange Money",
       "cat": "Factures",
-      "montant": -14514,
-      "note": "338"
+      "montant": -14514
     },
     {
       "date": "03/06",
@@ -623,12 +670,30 @@ export const SEED: SeedData = {
     },
     {
       "date": "03/06",
+      "lib": "Banque → Orange Money (pour maman)",
+      "type": "virement",
+      "compte": "Banque→OM",
+      "cat": "",
+      "montant": 100000,
+      "note": "sans frais"
+    },
+    {
+      "date": "03/06",
       "lib": "Aide à maman (dette commerce)",
       "type": "dépense",
       "compte": "Orange Money",
-      "cat": "Famille",
+      "cat": "Aide famille",
       "montant": -100000,
       "note": "sans frais — sa part 1/3"
+    },
+    {
+      "date": "03/06",
+      "lib": "OM → Djamo (courant)",
+      "type": "virement",
+      "compte": "OM→Djamo",
+      "cat": "",
+      "montant": 391000,
+      "note": "387 090 reçus"
     },
     {
       "date": "03/06",
@@ -641,12 +706,37 @@ export const SEED: SeedData = {
     },
     {
       "date": "03/06",
+      "lib": "Djamo → Coffre Fonds d'urgence",
+      "type": "virement",
+      "compte": "Djamo→Coffre",
+      "cat": "",
+      "montant": 387100,
+      "note": "gratuit"
+    },
+    {
+      "date": "03/06",
+      "lib": "Retrait guichet (banque→cash)",
+      "type": "virement",
+      "compte": "Banque→Cash",
+      "cat": "",
+      "montant": 140000
+    },
+    {
+      "date": "03/06",
       "lib": "Frais retrait guichet",
       "type": "dépense",
       "compte": "Banque",
       "cat": "Frais",
       "montant": -500,
       "note": "assumé"
+    },
+    {
+      "date": "03/06",
+      "lib": "Dépôt espèces sur Wave",
+      "type": "virement",
+      "compte": "Cash→Wave",
+      "cat": "",
+      "montant": 20000
     },
     {
       "date": "03/06",
@@ -663,8 +753,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Wave",
       "cat": "Frais",
-      "montant": -200,
-      "note": "338"
+      "montant": -200
     },
     {
       "date": "03/06",
@@ -685,15 +774,6 @@ export const SEED: SeedData = {
       "note": "espèces"
     },
     {
-      "date": "03/06",
-      "lib": "Frais abonnement Google",
-      "type": "dépense",
-      "compte": "Banque",
-      "cat": "Outils/Web",
-      "montant": -134,
-      "note": "débit SGBCI"
-    },
-    {
       "date": "04/06",
       "lib": "Yango maison→gare",
       "type": "dépense",
@@ -704,19 +784,27 @@ export const SEED: SeedData = {
     },
     {
       "date": "04/06",
+      "lib": "Monnaie Yango reçue sur Wave",
+      "type": "virement",
+      "compte": "Cash→Wave",
+      "cat": "",
+      "montant": 800,
+      "note": "800 envoyés, 10 frais"
+    },
+    {
+      "date": "04/06",
       "lib": "Frais Wave (monnaie)",
       "type": "dépense",
       "compte": "Wave",
       "cat": "Frais",
-      "montant": -10,
-      "note": "376"
+      "montant": -10
     },
     {
       "date": "04/06",
       "lib": "Tickets transport sœurs (2)",
       "type": "dépense",
       "compte": "Cash",
-      "cat": "Départ sœurs",
+      "cat": "Aide famille",
       "montant": -14200,
       "note": "7 100 x 2"
     },
@@ -725,18 +813,16 @@ export const SEED: SeedData = {
       "lib": "Frais bagages",
       "type": "dépense",
       "compte": "Cash",
-      "cat": "Départ sœurs",
-      "montant": -1000,
-      "note": "376"
+      "cat": "Aide famille",
+      "montant": -1000
     },
     {
       "date": "04/06",
       "lib": "Petit déjeuner enfants",
       "type": "dépense",
       "compte": "Cash",
-      "cat": "Départ sœurs",
-      "montant": -1000,
-      "note": "376"
+      "cat": "Aide famille",
+      "montant": -1000
     },
     {
       "date": "04/06",
@@ -744,8 +830,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -300,
-      "note": "376"
+      "montant": -300
     },
     {
       "date": "04/06",
@@ -753,8 +838,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -800,
-      "note": "376"
+      "montant": -800
     },
     {
       "date": "04/06",
@@ -789,8 +873,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -500,
-      "note": "376"
+      "montant": -500
     },
     {
       "date": "04/06",
@@ -798,8 +881,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -200,
-      "note": "376"
+      "montant": -200
     },
     {
       "date": "04/06",
@@ -807,8 +889,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -500,
-      "note": "376"
+      "montant": -500
     },
     {
       "date": "04/06",
@@ -816,11 +897,10 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Wave",
       "cat": "Transport",
-      "montant": -900,
-      "note": "398"
+      "montant": -900
     },
     {
-      "date": "04/06",
+      "date": "05/06",
       "lib": "Transport maison→car",
       "type": "dépense",
       "compte": "Cash",
@@ -839,12 +919,55 @@ export const SEED: SeedData = {
     },
     {
       "date": "05/06",
+      "lib": "Dépôt cash → Wave",
+      "type": "virement",
+      "compte": "Cash→Wave",
+      "cat": "",
+      "montant": 33500
+    },
+    {
+      "date": "05/06",
+      "lib": "Wave → Djamo (rechargement)",
+      "type": "virement",
+      "compte": "Wave→Djamo",
+      "cat": "",
+      "montant": 34000,
+      "note": "33 660 reçus"
+    },
+    {
+      "date": "05/06",
       "lib": "Frais rechargement Djamo",
       "type": "dépense",
       "compte": "Wave",
       "cat": "Frais",
-      "montant": -340,
-      "note": "398"
+      "montant": -340
+    },
+    {
+      "date": "05/06",
+      "lib": "Djamo → Coffre Fonds urgence",
+      "type": "virement",
+      "compte": "Djamo→Coffre",
+      "cat": "",
+      "montant": 20000,
+      "note": "gratuit"
+    },
+    {
+      "date": "05/06",
+      "lib": "Djamo → Coffre Scolarité",
+      "type": "virement",
+      "compte": "Djamo→Coffre",
+      "cat": "",
+      "montant": 13500,
+      "note": "gratuit"
+    },
+    {
+      "date": "05/06",
+      "lib": "Dépôt cash → Orange Money",
+      "type": "virement",
+      "compte": "Cash→OM",
+      "cat": "",
+      "montant": 13000,
+      "note": "12 900 reçus (100 frais)"
     },
     {
       "date": "05/06",
@@ -942,8 +1065,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -500,
-      "note": "422"
+      "montant": -500
     },
     {
       "date": "08/06",
@@ -951,8 +1073,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -500,
-      "note": "422"
+      "montant": -500
     },
     {
       "date": "08/06",
@@ -983,12 +1104,20 @@ export const SEED: SeedData = {
     },
     {
       "date": "09/06",
+      "lib": "Cash → Wave (via collègue)",
+      "type": "virement",
+      "compte": "Cash→Wave",
+      "cat": "",
+      "montant": 1000,
+      "note": "1000 cash donné, 1000 reçu sur Wave"
+    },
+    {
+      "date": "09/06",
       "lib": "Transport Bimbresso→maison (soir)",
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -100,
-      "note": "431"
+      "montant": -100
     },
     {
       "date": "09/06",
@@ -1005,11 +1134,10 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Copine",
-      "montant": -200,
-      "note": "438"
+      "montant": -200
     },
     {
-      "date": "09/06",
+      "date": "10/06",
       "lib": "Transport maison→Bimbresso",
       "type": "dépense",
       "compte": "Cash",
@@ -1023,8 +1151,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash",
       "cat": "Transport",
-      "montant": -100,
-      "note": "438"
+      "montant": -100
     },
     {
       "date": "10/06",
@@ -1050,8 +1177,16 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -1300,
-      "note": "95"
+      "montant": -1300
+    },
+    {
+      "date": "11/06",
+      "lib": "Coffre Scolarité → Djamo courant",
+      "type": "virement",
+      "compte": "Coffre→Djamo",
+      "cat": "",
+      "montant": 10000,
+      "note": "RETRAIT du coffre — à rembourser"
     },
     {
       "date": "11/06",
@@ -1068,15 +1203,23 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo",
       "cat": "Frais",
-      "montant": -100,
-      "note": "95"
+      "montant": -100
+    },
+    {
+      "date": "11/06",
+      "lib": "Coffre Fonds urgence → Djamo",
+      "type": "virement",
+      "compte": "Coffre→Djamo",
+      "cat": "",
+      "montant": 5000,
+      "note": "RETRAIT fonds urgence — à rembourser"
     },
     {
       "date": "11/06",
       "lib": "Don anniversaire (petit)",
       "type": "dépense",
       "compte": "Wave",
-      "cat": "Famille",
+      "cat": "Aide famille",
       "montant": -4995,
       "note": "BEAH"
     },
@@ -1127,6 +1270,15 @@ export const SEED: SeedData = {
     },
     {
       "date": "13/06",
+      "lib": "Coffre Fonds urgence → Djamo",
+      "type": "virement",
+      "compte": "Coffre→Djamo",
+      "cat": "",
+      "montant": 23000,
+      "note": "pour frais santé"
+    },
+    {
+      "date": "13/06",
       "lib": "Frais de santé",
       "type": "dépense",
       "compte": "Djamo",
@@ -1140,8 +1292,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo",
       "cat": "Frais",
-      "montant": -225,
-      "note": "453"
+      "montant": -225
     },
     {
       "date": "13/06",
@@ -1163,10 +1314,19 @@ export const SEED: SeedData = {
     },
     {
       "date": "13/06",
+      "lib": "Cash → Wave (rechargement)",
+      "type": "virement",
+      "compte": "Cash→Wave",
+      "cat": "",
+      "montant": 500,
+      "note": "pour payer livraison"
+    },
+    {
+      "date": "13/06",
       "lib": "Livraison colis (assurance papa)",
       "type": "dépense",
       "compte": "Cash+Wave",
-      "cat": "Famille",
+      "cat": "Aide famille",
       "montant": -1500,
       "note": "1000 cash + 500 wave"
     },
@@ -1203,17 +1363,25 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo",
       "cat": "Frais",
-      "montant": -230,
-      "note": "467"
+      "montant": -230
     },
     {
-      "date": "16/06",
+      "date": "15/06",
       "lib": "Don taxi Sysy (reste cash)",
       "type": "dépense",
       "compte": "Cash",
       "cat": "Copine",
       "montant": -176,
       "note": "solde cash à 0"
+    },
+    {
+      "date": "03/06",
+      "lib": "Frais abonnement Google",
+      "type": "dépense",
+      "compte": "Banque",
+      "cat": "Outils/Web",
+      "montant": -134,
+      "note": "débit SGBCI"
     },
     {
       "date": "16/06",
@@ -1271,12 +1439,79 @@ export const SEED: SeedData = {
     },
     {
       "date": "17/06",
+      "lib": "Retrait Wave → espèces",
+      "type": "virement",
+      "compte": "Wave",
+      "cat": "",
+      "montant": -1000,
+      "note": "pour espèces"
+    },
+    {
+      "date": "17/06",
+      "lib": "Retrait Wave → espèces",
+      "type": "virement",
+      "compte": "Cash (espèces)",
+      "cat": "",
+      "montant": 1000
+    },
+    {
+      "date": "17/06",
+      "lib": "Banque → OM",
+      "type": "virement",
+      "compte": "Banque (SGBCI)",
+      "cat": "",
+      "montant": -1000,
+      "note": "sans frais"
+    },
+    {
+      "date": "17/06",
+      "lib": "Banque → OM",
+      "type": "virement",
+      "compte": "Orange Money",
+      "cat": "",
+      "montant": 1000
+    },
+    {
+      "date": "17/06",
+      "lib": "OM → Djamo",
+      "type": "virement",
+      "compte": "Orange Money",
+      "cat": "",
+      "montant": -990
+    },
+    {
+      "date": "17/06",
+      "lib": "OM → Djamo",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": 990,
+      "note": "reçu 990"
+    },
+    {
+      "date": "17/06",
       "lib": "Frais OM → Djamo",
       "type": "dépense",
       "compte": "Orange Money",
       "cat": "Frais",
-      "montant": -10,
-      "note": "46190"
+      "montant": -10
+    },
+    {
+      "date": "17/06",
+      "lib": "Djamo → Wave",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": -1000
+    },
+    {
+      "date": "17/06",
+      "lib": "Djamo → Wave",
+      "type": "virement",
+      "compte": "Wave",
+      "cat": "",
+      "montant": 1000,
+      "note": "reçu 1000"
     },
     {
       "date": "17/06",
@@ -1284,8 +1519,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo (courant)",
       "cat": "Frais",
-      "montant": -10,
-      "note": "46190"
+      "montant": -10
     },
     {
       "date": "17/06",
@@ -1343,12 +1577,20 @@ export const SEED: SeedData = {
     },
     {
       "date": "18/06",
+      "lib": "Remboursement frais nourritures",
+      "type": "revenu",
+      "compte": "Wave",
+      "cat": "",
+      "montant": 1000,
+      "note": "reçu 1000"
+    },
+    {
+      "date": "18/06",
       "lib": "Transfert à Fabrice",
       "type": "dépense",
       "compte": "Wave",
       "cat": "Frais de transfert",
-      "montant": -105,
-      "note": "46191"
+      "montant": -105
     },
     {
       "date": "18/06",
@@ -1356,53 +1598,96 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -150,
-      "note": "46192"
+      "montant": -150
     },
     {
-      "date": "18/06",
+      "date": "19/06",
       "lib": "achat d'œuf",
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -500,
-      "note": "46193"
+      "montant": -500
     },
     {
-      "date": "18/06",
+      "date": "20/06",
+      "lib": "Retrait fond d'urgenve → compte courant Djamo",
+      "type": "virement",
+      "compte": "Coffre Fonds d'urgence",
+      "cat": "",
+      "montant": -2000
+    },
+    {
+      "date": "20/06",
+      "lib": "Retrait fond d'urgenve → compte courant Djamo",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": 2000
+    },
+    {
+      "date": "20/06",
       "lib": "Transfert à synhia",
       "type": "dépense",
       "compte": "Djamo (courant)",
       "cat": "Copine",
-      "montant": -2020,
-      "note": "46193"
+      "montant": -2020
     },
     {
-      "date": "18/06",
+      "date": "20/06",
       "lib": "achat d'œuf et de pain",
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -350,
-      "note": "46194"
+      "montant": -350
     },
     {
-      "date": "18/06",
+      "date": "21/06",
       "lib": "achat de nourriture",
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -550,
-      "note": "46197"
+      "montant": -550
     },
     {
-      "date": "18/06",
+      "date": "24/06",
+      "lib": "Retrait fond d'urgenve → compte courant Djamo",
+      "type": "virement",
+      "compte": "Coffre Fonds d'urgence",
+      "cat": "",
+      "montant": -3100
+    },
+    {
+      "date": "24/06",
+      "lib": "Retrait fond d'urgenve → compte courant Djamo",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": 3100
+    },
+    {
+      "date": "24/06",
+      "lib": "Djamo → Wave",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": -3000
+    },
+    {
+      "date": "24/06",
       "lib": "Frais de transfert",
       "type": "dépense",
       "compte": "Djamo (courant)",
       "cat": "Frais de transfert",
-      "montant": -30,
-      "note": "46197"
+      "montant": -30
+    },
+    {
+      "date": "24/06",
+      "lib": "Djamo → Wave",
+      "type": "virement",
+      "compte": "Wave",
+      "cat": "",
+      "montant": 3000,
+      "note": "reçu 3000"
     },
     {
       "date": "24/06",
@@ -1410,38 +1695,154 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -700,
-      "note": "46197"
+      "montant": -700
     },
     {
       "date": "24/06",
+      "lib": "Retrouve de l'argent dans mon pantalon",
+      "type": "revenu",
+      "compte": "Cash (espèces)",
+      "cat": "",
+      "montant": 50
+    },
+    {
+      "date": "25/06",
       "lib": "Achat nourriture",
       "type": "dépense",
       "compte": "Wave",
       "cat": "Nourriture",
-      "montant": -850,
-      "note": "46198"
+      "montant": -850
     },
     {
-      "date": "24/06",
+      "date": "25/06",
+      "lib": "Retrait fond d'urgenve → compte courant Djamo",
+      "type": "virement",
+      "compte": "Coffre Fonds d'urgence",
+      "cat": "",
+      "montant": -30000
+    },
+    {
+      "date": "25/06",
+      "lib": "Retrait fond d'urgenve → compte courant Djamo",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": 30000
+    },
+    {
+      "date": "25/06",
+      "lib": "Djamo → OM",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": -30000
+    },
+    {
+      "date": "25/06",
+      "lib": "Djamo → OM",
+      "type": "virement",
+      "compte": "Orange Money",
+      "cat": "",
+      "montant": 30000
+    },
+    {
+      "date": "25/06",
+      "lib": "OM → Djamo",
+      "type": "virement",
+      "compte": "Orange Money",
+      "cat": "",
+      "montant": -29700
+    },
+    {
+      "date": "25/06",
+      "lib": "OM → Djamo",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": 29700
+    },
+    {
+      "date": "25/06",
       "lib": "OM → Djamo",
       "type": "dépense",
       "compte": "Orange Money",
       "cat": "Frais de transfert",
-      "montant": -300,
-      "note": "46198"
+      "montant": -300
     },
     {
-      "date": "24/06",
+      "date": "25/06",
+      "lib": "Djamo → Coffre Fonds urgence",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": -29773
+    },
+    {
+      "date": "25/06",
+      "lib": "Djamo → Coffre Fonds urgence",
+      "type": "virement",
+      "compte": "Coffre Fonds d'urgence",
+      "cat": "",
+      "montant": 29773
+    },
+    {
+      "date": "26/06",
+      "lib": "Compte courant→ Compte bloqué",
+      "type": "virement",
+      "compte": "Banque (SGBCI)",
+      "cat": "",
+      "montant": -30000
+    },
+    {
+      "date": "26/06",
+      "lib": "Compte courant→ Compte bloqué",
+      "type": "virement",
+      "compte": "Épargne forcée (prêt)",
+      "cat": "",
+      "montant": 30000
+    },
+    {
+      "date": "26/06",
+      "lib": "Retrait fond d'urgenve → compte courant Djamo",
+      "type": "virement",
+      "compte": "Coffre Fonds d'urgence",
+      "cat": "",
+      "montant": -12200
+    },
+    {
+      "date": "26/06",
+      "lib": "Retrait fond d'urgenve → compte courant Djamo",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": 12200
+    },
+    {
+      "date": "26/06",
+      "lib": "Djamo → OM",
+      "type": "virement",
+      "compte": "Djamo (courant)",
+      "cat": "",
+      "montant": -12200
+    },
+    {
+      "date": "26/06",
+      "lib": "Djamo → OM",
+      "type": "virement",
+      "compte": "Orange Money",
+      "cat": "",
+      "montant": 12200
+    },
+    {
+      "date": "26/06",
       "lib": "Paiement Abonnement Claude",
       "type": "dépense",
       "compte": "Orange Money",
       "cat": "Outils/Web",
-      "montant": -12155,
-      "note": "46199"
+      "montant": -12155
     },
     {
-      "date": "24/06",
+      "date": "26/06",
       "lib": "Cours particulier (Ariel)",
       "type": "revenu",
       "compte": "Orange Money",
@@ -1599,8 +2000,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo (courant)",
       "cat": "Frais de transfert",
-      "montant": -110,
-      "note": "46200"
+      "montant": -110
     },
     {
       "date": "27/06",
@@ -1653,8 +2053,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Djamo (courant)",
       "cat": "Frais de transfert",
-      "montant": -101,
-      "note": "46200"
+      "montant": -101
     },
     {
       "date": "27/06",
@@ -1671,8 +2070,7 @@ export const SEED: SeedData = {
       "type": "virement",
       "compte": "Cash (espèces)",
       "cat": "Transfert",
-      "montant": 10000,
-      "note": "46200"
+      "montant": 10000
     },
     {
       "date": "27/06",
@@ -1779,11 +2177,10 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash (espèces)",
       "cat": "Nourriture",
-      "montant": -700,
-      "note": "46202"
+      "montant": -700
     },
     {
-      "date": "28/06",
+      "date": "29/06",
       "lib": "Salaire juin reçu",
       "type": "revenu",
       "compte": "Banque (SGBCI)",
@@ -1806,8 +2203,7 @@ export const SEED: SeedData = {
       "type": "virement",
       "compte": "Banque (SGBCI)",
       "cat": "Transfert",
-      "montant": -250000,
-      "note": "46203"
+      "montant": -250000
     },
     {
       "date": "30/06",
@@ -1815,8 +2211,7 @@ export const SEED: SeedData = {
       "type": "virement",
       "compte": "Cash (espèces)",
       "cat": "Transfert",
-      "montant": 250000,
-      "note": "46203"
+      "montant": 250000
     },
     {
       "date": "30/06",
@@ -1824,8 +2219,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Banque (SGBCI)",
       "cat": "Prêt",
-      "montant": -94179,
-      "note": "46203"
+      "montant": -94179
     },
     {
       "date": "30/06",
@@ -1833,8 +2227,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Banque (SGBCI)",
       "cat": "Outils/Web",
-      "montant": -6500,
-      "note": "46203"
+      "montant": -6500
     },
     {
       "date": "30/06",
@@ -1851,8 +2244,7 @@ export const SEED: SeedData = {
       "type": "virement",
       "compte": "Djamo (courant)",
       "cat": "Transfert",
-      "montant": -74,
-      "note": "46203"
+      "montant": -74
     },
     {
       "date": "30/06",
@@ -1860,8 +2252,7 @@ export const SEED: SeedData = {
       "type": "virement",
       "compte": "Coffre Fonds d'urgence",
       "cat": "Transfert",
-      "montant": 200074,
-      "note": "46203"
+      "montant": 200074
     },
     {
       "date": "30/06",
@@ -1869,8 +2260,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Banque (SGBCI)",
       "cat": "Frais de transfert",
-      "montant": -5140,
-      "note": "46203"
+      "montant": -5140
     },
     {
       "date": "30/06",
@@ -1878,8 +2268,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Banque (SGBCI)",
       "cat": "Frais de transfert",
-      "montant": -143,
-      "note": "46203"
+      "montant": -143
     },
     {
       "date": "30/06",
@@ -1887,8 +2276,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash (espèces)",
       "cat": "Transport",
-      "montant": -6500,
-      "note": "46203"
+      "montant": -6500
     },
     {
       "date": "30/06",
@@ -1896,8 +2284,7 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash (espèces)",
       "cat": "Nourriture",
-      "montant": -8600,
-      "note": "46203"
+      "montant": -8600
     },
     {
       "date": "30/06",
@@ -1905,503 +2292,15 @@ export const SEED: SeedData = {
       "type": "dépense",
       "compte": "Cash (espèces)",
       "cat": "Santé",
-      "montant": -11865,
-      "note": "46203"
+      "montant": -11865
     },
     {
       "date": "30/06",
-      "lib": "Retrait SGCI - Espece",
-      "type": "virement",
-      "compte": "Banque (SGBCI)",
-      "cat": "Transfert",
-      "montant": -250000,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Retrait SGCI - Espece",
-      "type": "virement",
-      "compte": "Cash (espèces)",
-      "cat": "Transfert",
-      "montant": 250000,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport Bureau",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": 100,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Paiement Loyer",
-      "type": "dépense",
-      "compte": "Orange Money",
-      "cat": "Loyer",
-      "montant": -70700,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Chérie",
-      "type": "dépense",
+      "lib": "Reception monnaie transport",
+      "type": "revenu",
       "compte": "Wave",
-      "cat": "Nourriture",
-      "montant": -6565,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Garba",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -1000,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Recouvremnt Premium",
-      "type": "dépense",
-      "compte": "Djamo (courant)",
-      "cat": "Frais de transfert",
-      "montant": -2000,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Bissap",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -2000,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport Maison",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -100,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Insecticite et Soda",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Maison",
-      "montant": -3500,
-      "note": "46204"
-    },
-    {
-      "date": "30/06",
-      "lib": "Synthia",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Copine",
-      "montant": -10000,
-      "note": "46205"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport Bureau",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -200,
-      "note": "46205"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat biscuit",
-      "type": "dépense",
-      "compte": "Wave",
-      "cat": "Nourriture",
-      "montant": -800,
-      "note": "46205"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat nourriture",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -2500,
-      "note": "46205"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -100,
-      "note": "46205"
-    },
-    {
-      "date": "30/06",
-      "lib": "Pressing",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Vêtements",
-      "montant": -5000,
-      "note": "46206"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -100,
-      "note": "46205"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat petit dej",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -500,
-      "note": "46056"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport Marcory → YopougoN",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -1000,
-      "note": "46056"
-    },
-    {
-      "date": "30/06",
-      "lib": "Yopougon  → Bureau Emmanuel",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -1500,
-      "note": "46056"
-    },
-    {
-      "date": "30/06",
-      "lib": "Bureau Emmanuel → Chez moi à la maison",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -3500,
-      "note": "46056"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Soda",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -1000,
-      "note": "46056"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Pass Internet",
-      "type": "dépense",
-      "compte": "Orange Money",
-      "cat": "Outils/Web",
-      "montant": -500,
-      "note": "46056"
-    },
-    {
-      "date": "30/06",
-      "lib": "Nourriture",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -1600,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Chez moi → Bureau emmanuel ",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -900,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Bureau Emmanuel → Maison",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -3700,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Platre",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Maison",
-      "montant": -500,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -200,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat element de peinture",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Maison",
-      "montant": -9000,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat nourriture",
-      "type": "dépense",
-      "compte": "Wave",
-      "cat": "Nourriture",
-      "montant": -2500,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Prêt Sister Caro",
-      "type": "dépense",
-      "compte": "Djamo (courant)",
-      "cat": "Aide famille",
-      "montant": -101000,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Nourriture",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -4000,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Œuf",
-      "type": "dépense",
-      "compte": "Wave",
-      "cat": "Nourriture",
-      "montant": -200,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -2400,
-      "note": "46207"
-    },
-    {
-      "date": "30/06",
-      "lib": "Paiement Ordures",
-      "type": "dépense",
-      "compte": "Wave",
-      "cat": "Maison",
-      "montant": -1260,
-      "note": "46208"
-    },
-    {
-      "date": "30/06",
-      "lib": "Paiement quincallerie",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Maison",
-      "montant": -1500,
-      "note": "46208"
-    },
-    {
-      "date": "30/06",
-      "lib": "Petit Dej",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": 650,
-      "note": "46208"
-    },
-    {
-      "date": "30/06",
-      "lib": "Frais Hopital Synthia",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Santé",
-      "montant": -27500,
-      "note": "46208"
-    },
-    {
-      "date": "30/06",
-      "lib": "Paiement Ordonnace Synthia",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Santé",
-      "montant": -10560,
-      "note": "46208"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -1600,
-      "note": "46208"
-    },
-    {
-      "date": "30/06",
-      "lib": "Paiement perplexity",
-      "type": "dépense",
-      "compte": "Orange Money",
-      "cat": "Outils/Web",
-      "montant": -12063,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Fcture Abonnement Transport",
-      "type": "dépense",
-      "compte": "Djamo (courant)",
-      "cat": "Transport",
-      "montant": -40400,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Paiement Pain",
-      "type": "dépense",
-      "compte": "Wave",
-      "cat": "Nourriture",
-      "montant": -150,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Fuite ",
-      "type": "dépense",
-      "compte": "Wave",
-      "cat": "Autre",
-      "montant": -100,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Nourriture",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -750,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat chaussette",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Vêtements",
-      "montant": -1000,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport bureau yopougon",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -1000,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat maison",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Maison",
-      "montant": -18500,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat Provision",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Provisions",
-      "montant": -23100,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat pour enfants",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Autre",
-      "montant": -6000,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -5000,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport",
-      "type": "dépense",
-      "compte": "Wave",
-      "cat": "Transport",
-      "montant": -1515,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Achat boulangerie",
-      "type": "dépense",
-      "compte": "Wave",
-      "cat": "Nourriture",
-      "montant": -300,
-      "note": "46209"
-    },
-    {
-      "date": "30/06",
-      "lib": "Transport",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Transport",
-      "montant": -1200,
-      "note": "46210"
-    },
-    {
-      "date": "30/06",
-      "lib": "Petit dééjeuné",
-      "type": "dépense",
-      "compte": "Cash (espèces)",
-      "cat": "Nourriture",
-      "montant": -500,
-      "note": "46210"
+      "cat": "",
+      "montant": 595
     }
   ]
 };

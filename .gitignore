@@ -16,3 +16,8 @@ Fiche*.zip
 next-env.d.ts
 .vercel
 .env*
+
+# Données personnelles (Excel source) — ne pas publier
+*.xlsx
+*.xls
+build/
