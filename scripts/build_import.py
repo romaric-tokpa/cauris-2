@@ -330,7 +330,7 @@ for i, o in enumerate(july_new):
     o["_t"] = ""
 
 cycles = {
-    "activeId": "2026-06",
+    "activeId": "2026-07",
     "months": [
         {"id": "2026-06", "label": "Juin 2026", "mm": "06", "year": 2026, "monthName": "juin", "seed": True},
         {"id": "2026-07", "label": "Juillet 2026", "mm": "07", "year": 2026, "monthName": "juillet", "seed": False,
