@@ -412,3 +412,26 @@ body {
   display: flex;
   gap: 8px;
 }
+
+@media (max-width: 520px) {
+  .bk-shell {
+    padding: 16px 12px 48px;
+  }
+  .bk-item {
+    padding: 12px 13px;
+  }
+  .bk-item-actions {
+    width: 100%;
+  }
+  .bk-item-actions .bk-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .bk-actions {
+    gap: 10px;
+  }
+  .bk-btn.dark {
+    width: 100%;
+    justify-content: center;
+  }
+}

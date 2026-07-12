@@ -788,6 +788,105 @@ body.sheet-open{overflow:hidden}
   .foot{flex-direction:column;gap:8px;text-align:center}
 }
 
+/* ============================================================
+   MOBILE — compactage pour téléphones (blocs & cards réduits)
+   ============================================================ */
+@media(max-width:640px){
+  /* Anti-débordement horizontal : tout tient dans la largeur de l'écran */
+  html,body{overflow-x:hidden;max-width:100%}
+  *{min-width:0}
+  img,svg,canvas,table{max-width:100%}
+  body{font-size:13px}
+
+  /* En-tête plus compact */
+  .topbar .inner{padding:11px 12px 10px;gap:9px}
+  .brand{gap:10px}
+  .brand .mark{width:34px;height:34px;font-size:13px;border-radius:9px}
+  .brand .logo{font-size:17px}
+  .brand .meta{font-size:8.5px}
+  .tabs{padding:2px 12px 10px;gap:3px}
+  .tab{padding:7px 11px;font-size:12px}
+  .cauris-logout-tab{padding:7px 9px;font-size:11px}
+  .cauris-logout-tab span{display:none}      /* icônes seules sur petit écran */
+  .month-select,.newmonth{font-size:9.5px;padding:7px 9px}
+  .asof,.asof-label,#asof-label{font-size:9px}
+
+  /* Contenu : marges réduites */
+  .wrap{padding:13px 11px 88px}
+
+  /* KPIs compacts (1 colonne) */
+  .kpis{gap:9px;margin-bottom:13px}
+  .kpi{padding:12px 13px;border-radius:10px}
+  .kpi .k{font-size:9px}
+  .kpi .v{font-size:22px;margin-top:5px;white-space:nowrap}
+  .kpi .v .cur{font-size:10px;margin-left:3px}
+  .kpi .d{font-size:10.5px;margin-top:5px}
+
+  /* Cards compactes */
+  .card{padding:13px 13px;border-radius:10px}
+  .card .ct{font-size:9px;margin-bottom:11px}
+  .cols{gap:11px;margin-bottom:11px}
+  .sec-title{margin-bottom:12px;gap:8px;flex-wrap:wrap}
+  .sec-title h2{font-size:16px}
+  .sec-title .sub{font-size:11px;width:100%;margin-left:0}
+
+  /* Contrôle de cohérence : empilé et compact */
+  .coh{padding:13px 14px;border-radius:10px;gap:10px}
+  .coh-checks{gap:6px}
+  .coh-chk{font-size:10.5px}
+  .coh-patr{font-size:16px}
+
+  /* Donut & jauges plus petits, centrés */
+  .donut-wrap{gap:14px;justify-content:center}
+  .donut{width:118px;height:118px}
+  .donut::after{inset:20px}
+  .donut .center b{font-size:12px}
+  .ring{width:104px;height:104px}
+  .cf-ring{width:88px;height:88px}
+  .gauge-wrap{gap:14px}
+  .legend .li,.donutLegend .li{font-size:11px}
+
+  /* Soldes par compte & barres */
+  .acg-sub{font-size:13px}
+  .acbal{font-size:16px}
+  .acname{font-size:13px}
+  .bar-row{gap:8px}
+  .bl{font-size:11px}
+  .bv{font-size:11px}
+
+  /* Journal d'opérations plus dense */
+  .feed-day{margin-bottom:12px}
+  .fd-head{padding:8px 10px}
+  .op{padding:10px 10px}
+  .op-lib{font-size:12.5px}
+  .op-amt{font-size:14px}
+
+  /* Formulaires compacts */
+  .fform{padding:16px 14px}
+  .fstep{gap:10px}
+
+  /* Coffres, dettes, ventilation */
+  .cf{padding:14px}
+  .cf-name{font-size:14px}
+  .vcard{padding:14px}
+
+  /* Bouton flottant d'ajout */
+  .quickadd{width:52px;height:52px}
+}
+
+/* Très petits écrans (≤ 380 px, type iPhone SE / mini) */
+@media(max-width:380px){
+  .wrap{padding:11px 8px 84px}
+  .brand .logo{font-size:16px}
+  .kpi{padding:11px 12px}
+  .kpi .v{font-size:20px}
+  .card{padding:11px 11px}
+  .donut{width:104px;height:104px}
+  .donut::after{inset:18px}
+  .cf-ring{width:80px;height:80px}
+  .tab{padding:6px 9px;font-size:11.5px}
+}
+
 @media print{
   body{background:#fff}
   .topbar{position:static;border-bottom:2px solid var(--anthracite)}
