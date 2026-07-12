@@ -215,6 +215,20 @@ def agg(ops, accts, when):
 
 # Reconstruction des virements de juillet, puis soldes live simulés (comme app.js)
 july_new, july_unpaired = pair_virements(july_ops)
+
+# Ré-attribution des retraits SGCI/SGBCI : le journal les source depuis le compte
+# courant Banque (SGBCI) (782 F fin juin) alors qu'ils proviennent de l'épargne SG.
+# On corrige la source -> "Épargne forcée (prêt)" pour rendre juillet cohérent.
+SG_SAVINGS = "Épargne forcée (prêt)"
+reattrib = 0
+for o in july_new:
+    if o["type"] == "virement" and o["compte"] == "Banque (SGBCI)" \
+       and ("SGCI" in o["lib"] or "SGBCI" in o["lib"]):
+        o["compte"] = SG_SAVINGS
+        note = o.get("note", "") or ""
+        o["note"] = (note + " · source ré-attribuée à l'épargne SG").strip(" ·")
+        reattrib += 1
+
 _live = simulate_live(accounts, july_new)
 for a in accounts:
     a["solde_live"] = _live[a["nom"]]
@@ -309,6 +323,7 @@ for a in accounts:
     flag = "  ⚠ DÉCOUVERT" if a["solde_live"] < 0 else ""
     print(f"  {a['nom']:<26} {a['type']:<11} fin-juin/ouv.juil={a['solde_fin_juin']:>10}  live-juil={a['solde_live']:>10}{flag}")
 print(f"\nOpérations juin: {len(june_ops)}  | juillet: {len(july_ops)} (dont virements appariés -> {len(july_new)} lignes, {july_unpaired} legs non appariés)")
+print(f"Retraits SGCI/SGBCI ré-attribués (Banque -> {SG_SAVINGS}) : {reattrib}")
 print(f"\nJUIN  — patrimoine={june['patrimoine']:,}  dispo={june['dispo']:,}  coffres={june['coffres']:,}  bloque={june['bloque']:,}")
 print(f"        dépenses={june['dep']:,}  revenus={june['rev']:,}  net={june['net']:,}  taux={june['taux']*100:.1f}%")
 print(f"JUIL. — patrimoine(live)={july['patrimoine']:,}  dispo={july['dispo']:,}  coffres={july['coffres']:,}  bloque={july['bloque']:,}")
