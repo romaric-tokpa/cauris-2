@@ -404,11 +404,16 @@
       else { sel.value=''; document.getElementById('fCatCustom').style.display='none'; }
     } else { document.getElementById('fCat').value=''; document.getElementById('fCatCustom').style.display='none'; document.getElementById('fCatCustom').value=''; }
     document.getElementById('fMontant').value=o?Math.abs(o.montant):'';
-    document.getElementById('fFrais').value='';
+    let fraisVal='';
+    if(editIdx && editIdx[0]==='n' && o && o._xlink && o.cat!=='Frais'){
+      const lf=newOps.find(x=>x!==o && x.cat==='Frais' && x._xlink===o._xlink);
+      if(lf) fraisVal=Math.abs(lf.montant);
+    }
+    document.getElementById('fFrais').value=fraisVal;
     document.getElementById('fNote').value=o?(o.note||''):'';
     document.getElementById('fCompteDest').value=o&&o.compteDest?o.compteDest:'';
     document.getElementById('formTitle').textContent=(editIdx!=null)?(editIdx[0]==='a'?'Modifier l’opération importée':'Modifier l’opération'):'Nouvelle opération';
-    document.getElementById('fFraisWrap').style.display=(editIdx!=null)?'none':'';
+    document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':'';
     syncType(); document.getElementById('fLib').focus();
   }
   document.addEventListener('change', e=>{
@@ -419,7 +424,7 @@
   function syncType(){ const t=document.getElementById('fType').value;
     document.getElementById('destWrap').style.display=(t==='virement')?'flex':'none';
     document.getElementById('catWrap').style.display=(t==='virement')?'none':'';
-    document.getElementById('fFraisWrap').style.display=(editIdx!=null)?'none':''; }
+    document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':''; }
   function saveForm(){
     const date=document.getElementById('fDate').value.trim();
     const lib=document.getElementById('fLib').value.trim();
@@ -440,7 +445,13 @@
 
     if(editIdx!=null){
       const kind=editIdx[0], idx=+editIdx.slice(2);
-      if(kind==='n'){ const p=newOps[idx]||{}; op._ts=p._ts||Date.now(); op._t=p._t||hhmm(); if(p._xlink) op._xlink=p._xlink; newOps[idx]=op; }
+      if(kind==='n'){ const p=newOps[idx]||{}; op._ts=p._ts||Date.now(); op._t=p._t||hhmm(); if(p._xlink) op._xlink=p._xlink; newOps[idx]=op;
+        let fi=newOps.findIndex(x=>x!==op && x.cat==='Frais' && x._xlink && op._xlink && x._xlink===op._xlink);
+        if(frais>0){
+          if(fi>=0){ const f=newOps[fi]; f.date=date; f.compte=compte; f.montant=-frais; f.lib='Frais — '+lib; }
+          else { if(!op._xlink) op._xlink='x'+Date.now(); newOps.push({date,lib:'Frais — '+lib,type:'dépense',compte,cat:'Frais',montant:-frais,note:'Frais de '+(type==='virement'?'virement':'transaction'),_xlink:op._xlink,_ts:Date.now()-1,_t:hhmm()}); }
+        } else if(fi>=0){ newOps.splice(fi,1); }
+      }
       else { opOverrides[idx]=op; if(opDeletes.includes(idx)) opDeletes=opDeletes.filter(x=>x!==idx); }
       persist(); closeForm(); refreshAll(); toast('Opération modifiée');
       return;
