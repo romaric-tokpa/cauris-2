@@ -50,7 +50,8 @@
   function coffreObjectif(c){ const o=coffreOverrides[c.nom]; return (o!=null&&o>0)?o:c.objectif; }
 
   /* ---------- base providers (seed vs derived) ---------- */
-  function baseComptes(){ return (M.seed? S.comptes : M.opening.comptes).map(c=>({...c})); }
+  function positionsValue(c){ return (c.positions||[]).reduce((s,p)=>s+(Number(p.quantite)||0)*(Number(p.coursActuel)||0),0); }
+  function baseComptes(){ return (M.seed? S.comptes : M.opening.comptes).map(c=>{ const cc={...c}; if(c.positions) cc.positions=c.positions.map(p=>({...p})); if(cc.type==='placement') cc.solde=positionsValue(cc); return cc; }); }
   function baseCoffres(){ return (M.seed? S.coffres : M.opening.coffres).map(c=>({...c})); }
   function baseCategories(){ const m={}; archivedOps().forEach(o=>{ if(o.type==='dépense'){ const l=o.cat||'Divers'; m[l]=(m[l]||0)+Math.abs(o.montant); } }); return m; }
   function baseRevCategories(){ const m={}; if(M.seed && S.revCategories){ S.revCategories.forEach(x=>m[x.label]=x.value); } else { archivedOps().forEach(o=>{ if(o.type==='revenu'){ const l=o.cat||o.lib||'Divers'; m[l]=(m[l]||0)+Math.abs(o.montant); } }); } return m; }
@@ -102,20 +103,25 @@
       if(o.type==='dépense'){ if(map[o.compte]) map[o.compte].solde-=a; }
       else if(o.type==='revenu'){ if(map[o.compte]) map[o.compte].solde+=a; }
       else if(o.type==='virement'){ if(map[o.compte]) map[o.compte].solde-=a; if(o.compteDest&&map[o.compteDest]) map[o.compteDest].solde+=a; }
+      // titres : le compte "placement" tire sa valeur de ses positions (marché),
+      // les opérations ne bougent que le CASH des comptes source/destination.
+      else if(o.type==='achat_titre'){ if(map[o.compte]) map[o.compte].solde-=a; }
+      else if(o.type==='dividende'){ if(map[o.compte]) map[o.compte].solde+=a; }
+      else if(o.type==='vente_titre'){ if(map[o.compte]) map[o.compte].solde+=a; }
     });
     return Object.values(map);
   }
   function sumType(c,t){ return c.filter(x=>x.type===t).reduce((s,x)=>s+x.solde,0); }
   function liveKpis(){
     const c=liveComptes();
-    const dispo=sumType(c,'disponible'), coffres=sumType(c,'épargne'), bloque=sumType(c,'bloqué');
+    const dispo=sumType(c,'disponible'), coffres=sumType(c,'épargne'), bloque=sumType(c,'bloqué'), placement=sumType(c,'placement');
     const newDep=newOps.filter(o=>o.type==='dépense').reduce((s,o)=>s+Math.abs(o.montant),0);
-    const newRev=newOps.filter(o=>o.type==='revenu').reduce((s,o)=>s+Math.abs(o.montant),0);
+    const newRev=newOps.filter(o=>o.type==='revenu'||o.type==='dividende').reduce((s,o)=>s+Math.abs(o.montant),0);
     const depense = baseDepense()+newDep;
     const revenus = baseRevenus()+newRev;
     const epargneNette = revenus-depense;
     const tauxEpargne = revenus>0 ? epargneNette/revenus : 0;
-    return { patrimoine:dispo+coffres+bloque, disponible:dispo, epargne:coffres+bloque, coffres, bloque, depense, revenus, epargneNette, tauxEpargne, comptes:c };
+    return { patrimoine:dispo+coffres+bloque+placement, disponible:dispo, epargne:coffres+bloque, coffres, bloque, placement, depense, revenus, epargneNette, tauxEpargne, comptes:c };
   }
   function liveCategories(){
     const map=baseCategories();
@@ -131,6 +137,58 @@
   function liveCoffres(){
     const comptes=liveComptes();
     return baseCoffres().map(c=>{ const acct=comptes.find(a=>normName(a.nom)===normName(c.nom)); return {...c, epargne: acct?acct.solde:c.epargne}; });
+  }
+
+  /* ============================================================
+     PLACEMENTS / PORTEFEUILLE TITRES (BRVM) — structure réutilisable
+     ------------------------------------------------------------
+     Un compte de type "placement" porte une liste `positions`
+     [{code,nom,quantite,pru,coursActuel}]. Son solde = Σ quantite×coursActuel
+     (valeur de marché), calculé dans baseComptes(). Les opérations ne
+     déplacent que le CASH des comptes source/destination ; les titres
+     eux-mêmes vivent dans les positions du compte placement.
+     ============================================================ */
+  function placementSource(){ return M.seed? S.comptes : M.opening.comptes; }
+  function ensurePlacement(nom){
+    const src=placementSource();
+    let acct=src.find(c=>c.nom===nom);
+    if(!acct){ acct={nom, type:'placement', solde:0, positions:[]}; src.push(acct); saveCycles(); }
+    if(!acct.positions) acct.positions=[];
+    return acct;
+  }
+  /* Achat : sort le cash du compte source, crée/augmente la position (PRU moyen
+     pondéré, hors frais), enregistre les frais en dépense (cat "Frais"). */
+  function recordAchatTitre(o){
+    const acct=ensurePlacement(o.portefeuille||'Portefeuille BRVM');
+    const qty=Number(o.quantite)||0, pu=Number(o.prixUnitaire)||0;
+    let pos=acct.positions.find(p=>p.code===o.code);
+    if(pos){ const totCost=pos.quantite*pos.pru + qty*pu; pos.quantite+=qty; pos.pru=pos.quantite? Math.round(totCost/pos.quantite*100)/100:0; if(o.coursActuel!=null) pos.coursActuel=Number(o.coursActuel); }
+    else { pos={code:o.code, nom:o.nom||o.code, quantite:qty, pru:pu, coursActuel:o.coursActuel!=null?Number(o.coursActuel):pu}; acct.positions.push(pos); }
+    saveCycles();
+    const gid='t'+Date.now(), cout=qty*pu, frais=Math.abs(Number(o.frais)||0);
+    newOps.push({date:o.date, lib:'Achat '+qty+' × '+(o.nom||o.code), type:'achat_titre', compte:o.source, cat:'', montant:-cout, note:'PRU '+fmt(pu)+' · '+o.code, portefeuille:acct.nom, titre:o.code, _xlink:gid, _ts:Date.now(), _t:hhmm()});
+    if(frais>0) newOps.push({date:o.date, lib:'Frais — Achat '+o.code, type:'dépense', compte:o.source, cat:'Frais', montant:-frais, note:'Frais de courtage', _xlink:gid, _ts:Date.now()-1, _t:hhmm()});
+    persist(); refreshAll(); return pos;
+  }
+  /* Dividende : entre du cash en revenu (catégorie "Dividendes"), rattaché à une position. */
+  function recordDividende(o){
+    newOps.push({date:o.date, lib:o.lib||('Dividende '+o.code), type:'dividende', compte:o.dest, cat:'Dividendes', montant:Math.abs(Number(o.montant)||0), note:o.note||'', portefeuille:o.portefeuille||'Portefeuille BRVM', titre:o.code, _ts:Date.now(), _t:hhmm()});
+    persist(); refreshAll();
+  }
+  /* Vente : réduit/solde une position, rentre le cash brut sur le compte dest,
+     frais en dépense, calcule la +/- value réalisée (hors frais). */
+  function recordVenteTitre(o){
+    const acct=ensurePlacement(o.portefeuille||'Portefeuille BRVM');
+    const pos=acct.positions.find(p=>p.code===o.code);
+    if(!pos){ toast('Position introuvable : '+o.code); return null; }
+    const qty=Math.min(Number(o.quantite)||0, pos.quantite), pu=Number(o.prixUnitaire)||0, frais=Math.abs(Number(o.frais)||0);
+    const brut=qty*pu, net=brut-frais, plReal=Math.round(qty*(pu-pos.pru)*100)/100;
+    pos.quantite-=qty; if(pos.quantite<=0) acct.positions=acct.positions.filter(p=>p!==pos);
+    saveCycles();
+    const gid='t'+Date.now();
+    newOps.push({date:o.date, lib:'Vente '+qty+' × '+(pos.nom||o.code), type:'vente_titre', compte:o.dest, cat:'', montant:brut, note:'Net '+fmt(net)+' F · +/- value '+(plReal>=0?'+':'−')+fmt(Math.abs(plReal))+' F', portefeuille:acct.nom, titre:o.code, plReal:plReal, _xlink:gid, _ts:Date.now(), _t:hhmm()});
+    if(frais>0) newOps.push({date:o.date, lib:'Frais — Vente '+o.code, type:'dépense', compte:o.dest, cat:'Frais', montant:-frais, note:'Frais de courtage', _xlink:gid, _ts:Date.now()-1, _t:hhmm()});
+    persist(); refreshAll(); return {plReal, net};
   }
 
   /* ============================================================ DASHBOARD */
@@ -160,6 +218,7 @@
       {label:'Coffres (urgence + scolarité)', value:k.coffres, color:'var(--anthracite)'},
       {label:'Épargne bloquée', value:k.bloque, color:'var(--acier)'}
     ];
+    if(k.placement>0) split.push({label:'Placements (BRVM)', value:k.placement, color:'var(--violet)'});
     const tot=split.reduce((s,x)=>s+x.value,0)||1; let acc=0;
     const segs=split.map(s=>{ const a=acc,b=acc+s.value/tot*100; acc=b; return `${s.color} ${a.toFixed(2)}% ${b.toFixed(2)}%`; }).join(', ');
     document.getElementById('donut').style.background=`conic-gradient(${segs})`;
@@ -185,18 +244,20 @@
         : '<div class="vempty" style="padding:22px">Aucun revenu ce mois-ci pour l’instant.</div>';
     }
 
-    const groups=[{t:'Comptes disponibles',type:'disponible',pill:'dispo'},{t:'Coffres (épargne accessible)',type:'épargne',pill:'epargne'},{t:'Épargne bloquée',type:'bloqué',pill:'bloque'}];
+    const groups=[{t:'Comptes disponibles',type:'disponible',pill:'dispo'},{t:'Coffres (épargne accessible)',type:'épargne',pill:'epargne'},{t:'Placements (BRVM)',type:'placement',pill:'placement'},{t:'Épargne bloquée',type:'bloqué',pill:'bloque'}];
     const totalPatr=k.patrimoine||1;
-    const accent={'disponible':'var(--orange)','épargne':'var(--blue)','bloqué':'var(--acier)'};
+    const accent={'disponible':'var(--orange)','épargne':'var(--blue)','bloqué':'var(--acier)','placement':'var(--violet)'};
     const ICON={
       phone:'<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/>',
       bank:'<path d="M3 9.5 12 4l9 5.5"/><path d="M5 10v8M9 10v8M15 10v8M19 10v8"/><path d="M3.5 20.5h17"/>',
       cash:'<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/>',
-      safe:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="13" cy="12" r="3"/><path d="M3 8h2M3 16h2"/>'
+      safe:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="13" cy="12" r="3"/><path d="M3 8h2M3 16h2"/>',
+      chart:'<path d="M4 20V4M4 20h16"/><path d="M8 16l3.5-4 3 3L20 8"/>'
     };
     const svg=k2=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k2]||ICON.safe}</svg>`;
     function brandFor(nom,type){
       const n=nom.toLowerCase();
+      if(type==='placement') return {color:'#7A4FD0',icon:'chart'};
       if(type!=='disponible'){ if(/urgence/.test(n)) return {color:'#E2541A',icon:'safe'}; if(/scolar/.test(n)) return {color:'#2A6FDB',icon:'safe'}; return {color:'#6C737B',icon:'safe'}; }
       if(/banque|sgbci/.test(n)) return {color:'#1F3A5F',icon:'bank',logo:'assets/logo-sgbci.png'};
       if(/djamo/.test(n)) return {color:'#0A0A0A',icon:'phone',logo:'assets/logo-djamo.png'};
@@ -207,6 +268,7 @@
     }
     document.getElementById('acctList').innerHTML=groups.map(g=>{
       const items=k.comptes.filter(c=>c.type===g.type); const sub=items.reduce((s,c)=>s+c.solde,0);
+      if(!items.length) return '';
       const grpMax=Math.max(1,...items.map(c=>Math.abs(c.solde)));
       return `<div class="acg" style="--ac:${accent[g.type]}">
         <div class="acg-h"><div class="acg-l">${g.t}</div><div class="acg-r"><div class="acg-sub num">${fmt(sub)} F</div><div class="acg-pct">${(sub/totalPatr*100).toFixed(0)}% du patrimoine</div></div></div>
@@ -223,6 +285,16 @@
               ${dlt?`<span class="delta ${dlt>0?'up':'dn'}" title="Variation depuis l'ouverture du cycle">${dlt>0?'+':'−'}${fmt(Math.abs(dlt))}</span>`:''}
             </div>
             <div class="acbar"><div class="acbar-f" style="width:${w.toFixed(1)}%"></div></div>
+            ${c.type==='placement'&&c.positions&&c.positions.length?`<div class="acpos">`+c.positions.map(p=>{ const val=(Number(p.quantite)||0)*(Number(p.coursActuel)||0); const cost=(Number(p.quantite)||0)*(Number(p.pru)||0); const pl=val-cost; const plc=pl>=0?'up':'dn';
+              return `<div class="acpos-row">
+                <div class="acpos-h"><b>${p.code}</b> <span class="acpos-nom">${p.nom||''}</span> <span class="acpos-q">×${p.quantite}</span></div>
+                <div class="acpos-grid">
+                  <div><span>Valorisation</span><b class="num">${fmt(val)} F</b></div>
+                  <div><span>PRU</span><b class="num">${fmt(p.pru)}</b></div>
+                  <div><span>Cours</span><b class="num">${fmt(p.coursActuel)}</b></div>
+                  <div class="acpos-pl ${plc}"><span>+/- value latente</span><b class="num">${pl>=0?'+':'−'}${fmt(Math.abs(pl))} F</b></div>
+                </div>
+              </div>`; }).join('')+`</div>`:''}
           </div>`; }).join('')+
         `</div></div>`;
     }).join('');
@@ -320,10 +392,16 @@
     feed.innerHTML=groups.map(g=>{
       const dayDep=g.items.filter(x=>x.type==='dépense').reduce((s,x)=>s+Math.abs(x.montant),0);
       const rowsHtml=g.items.map(o=>{
-        const cls=o.type==='dépense'?'dep':o.type==='revenu'?'rev':'vir';
-        const ic=o.type==='dépense'?'↓':o.type==='revenu'?'↑':'⇄';
-        const sign=o.type==='dépense'?'−':o.type==='revenu'?'+':'';
-        const dest=o.type==='virement'&&o.compteDest?' → '+o.compteDest:'';
+        let cls,ic,sign;
+        if(o.type==='dépense'){ cls='dep'; ic='↓'; sign='−'; }
+        else if(o.type==='revenu'||o.type==='dividende'){ cls='rev'; ic='↑'; sign='+'; }
+        else if(o.type==='achat_titre'){ cls='vir'; ic='◆'; sign='−'; }
+        else if(o.type==='vente_titre'){ cls='rev'; ic='◆'; sign='+'; }
+        else { cls='vir'; ic='⇄'; sign=''; }
+        let dest='';
+        if(o.type==='virement'&&o.compteDest) dest=' → '+o.compteDest;
+        else if(o.type==='achat_titre'&&o.portefeuille) dest=' → '+o.portefeuille;
+        else if(o.type==='vente_titre'&&o.portefeuille) dest=' ← '+o.portefeuille;
         return `<div class="op">
           <span class="op-mark ${cls}">${ic}</span>
           <div class="op-main"><div class="op-lib">${o.lib}${o._new?'<span class="newtag">ajout</span>':''}${o._edited?'<span class="grouptag">modifiée</span>':''}${o._xlink?'<span class="grouptag">liée</span>':''}</div>${o.note?`<div class="op-note">${o.note}</div>`:''}</div>
@@ -798,7 +876,7 @@
   function monthTotals(meta){
     const ops=monthOps(meta);
     const depense=ops.filter(o=>o.type==='dépense').reduce((s,o)=>s+Math.abs(o.montant),0);
-    const revenu=ops.filter(o=>o.type==='revenu').reduce((s,o)=>s+Math.abs(o.montant),0);
+    const revenu=ops.filter(o=>o.type==='revenu'||o.type==='dividende').reduce((s,o)=>s+Math.abs(o.montant),0);
     return { depense, revenu, net:revenu-depense, count:ops.length };
   }
   function monthCategories(meta){
@@ -1082,6 +1160,9 @@
     document.querySelectorAll('#histSwitch .htab').forEach(b=>b.onclick=()=>setHistView(b.dataset.h));
     document.getElementById('monthSelect').onchange=e=>switchMonth(e.target.value);
     document.getElementById('newMonthBtn').onclick=newCycle;
+    // API réutilisable pour les opérations sur titres (BRVM & autres placements).
+    // Ex. : CaurisBRVM.achat({date:'JJ/MM', source:'Wave', code:'BOABF', nom:'BOA BF', quantite:3, prixUnitaire:5970, coursActuel:6050, frais:1154})
+    window.CaurisBRVM = { achat:recordAchatTitre, dividende:recordDividende, vente:recordVenteTitre, ensure:ensurePlacement };
   }
   if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
 })();

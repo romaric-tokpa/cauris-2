@@ -5,7 +5,7 @@
 :root{
   --anthracite:#1C2025; --orange:#E2541A; --acier:#6C737B;
   --beton:#F5F3EF; --hivis:#F2C200;
-  --green:#1F8A5B; --red:#C8431B; --blue:#2A6FDB;
+  --green:#1F8A5B; --red:#C8431B; --blue:#2A6FDB; --violet:#7A4FD0;
   --ink:#1C2025; --muted:#6C737B; --paper:#FFFFFF; --desk:#E5E1D9;
   --line:rgba(28,32,37,.12); --line-2:rgba(28,32,37,.22); --fill:#FBFAF7;
   --sans:'Archivo',ui-sans-serif,system-ui,sans-serif;
@@ -248,6 +248,21 @@ body{
 .acbar{height:4px;background:#E7E3DA;border-radius:3px;overflow:hidden}
 .acbar-f{height:100%;background:var(--ac);border-radius:3px;min-width:2px;transition:width .5s ease}
 @media(max-width:520px){.acg-rows{grid-template-columns:1fr}}
+
+/* --- positions d'un compte placement (titres) --- */
+.acpos{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.acpos-row{background:rgba(122,79,208,.06);border:1px solid rgba(122,79,208,.18);border-radius:9px;padding:9px 11px}
+.acpos-h{font-size:12.5px;color:var(--ink);margin-bottom:7px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.acpos-h b{font-family:var(--mono);font-weight:700;color:var(--violet);letter-spacing:.02em}
+.acpos-nom{color:var(--muted);font-size:11.5px}
+.acpos-q{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 7px}
+.acpos-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.acpos-grid>div{display:flex;flex-direction:column;gap:2px}
+.acpos-grid span{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.acpos-grid b{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:-.02em}
+.acpos-pl.up b{color:var(--green)}
+.acpos-pl.dn b{color:var(--red)}
+@media(max-width:520px){.acpos-grid{grid-template-columns:1fr 1fr}}
 
 /* Contrôle de cohérence */
 .coh{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:13px 18px;margin-bottom:26px}
