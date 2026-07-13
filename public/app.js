@@ -191,6 +191,139 @@
     persist(); refreshAll(); return {plReal, net};
   }
 
+  /* ============================================================
+     ONGLET BOURSE (BRVM) — interface dédiée par-dessus CaurisBRVM
+     ============================================================ */
+  let bourseEditCours=null;
+  function brvmAcct(){ return liveComptes().find(c=>c.type==='placement'); }
+  function brvmRawAcct(){ return (M.seed?S.comptes:M.opening.comptes).find(c=>c.type==='placement'); }
+  function brvmCashName(){ const a=brvmRawAcct(); return a&&a.compteEspeces; }
+  function brvmCashAcct(){ const n=brvmCashName(); return n? liveComptes().find(c=>c.nom===n):null; }
+  function collectBrvmOps(){
+    const out=[]; const types=['achat_titre','vente_titre','dividende'];
+    cycles.months.forEach(m=>{ const ops = m.id===M.id? newOps : (loadBucket(m.id).newOps||[]); ops.forEach(o=>{ if(types.includes(o.type)) out.push({...o,_month:m.label}); }); });
+    return out.sort((a,b)=> parseDate(b.date)-parseDate(a.date) || ((b._ts||0)-(a._ts||0)));
+  }
+  function fillBourseSelects(){
+    const cash=baseComptes().filter(c=>c.type!=='placement').map(c=>`<option>${c.nom}</option>`).join('');
+    ['baSource','bdDest','bvDest'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=cash; });
+    const acct=brvmAcct(); const pos=acct?(acct.positions||[]):[];
+    const posOpts=pos.length? pos.map(p=>`<option value="${p.code}">${p.code} — ${p.nom} (×${p.quantite})</option>`).join('') : '<option value="">Aucune position</option>';
+    ['bdCode','bvCode'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=posOpts; });
+  }
+  function closeBourseForms(){ ['brsAchatForm','brsDivForm','brsVenteForm'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('open'); }); }
+  function openBourseForm(which, presetCode){
+    closeBourseForms(); fillBourseSelects();
+    const cash=brvmCashName()||'';
+    if(which==='achat'){
+      ['baCode','baNom','baQte','baPu','baCours','baFrais'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('baDate').value=defaultOpDate();
+      if(cash) document.getElementById('baSource').value=cash;
+      document.getElementById('baPreview').innerHTML='';
+      document.getElementById('brsAchatForm').classList.add('open');
+      document.getElementById('baCode').focus();
+    } else if(which==='div'){
+      document.getElementById('bdMontant').value=''; document.getElementById('bdDate').value=defaultOpDate();
+      if(cash) document.getElementById('bdDest').value=cash;
+      if(presetCode) document.getElementById('bdCode').value=presetCode;
+      document.getElementById('brsDivForm').classList.add('open');
+    } else if(which==='vente'){
+      ['bvQte','bvPu','bvFrais'].forEach(id=>document.getElementById(id).value=''); document.getElementById('bvDate').value=defaultOpDate();
+      if(cash) document.getElementById('bvDest').value=cash;
+      if(presetCode) document.getElementById('bvCode').value=presetCode;
+      document.getElementById('bvPreview').innerHTML='';
+      document.getElementById('brsVenteForm').classList.add('open');
+      renderVentePreview();
+    }
+  }
+  function renderAchatPreview(){
+    const q=+document.getElementById('baQte').value||0, pu=+document.getElementById('baPu').value||0, frais=+document.getElementById('baFrais').value||0;
+    const cout=q*pu, el=document.getElementById('baPreview');
+    if(!cout&&!frais){ el.innerHTML=''; return; }
+    el.innerHTML=`<div class="brs-prev"><span>Titres <b class="num">${fmt(cout)} F</b></span><span>Frais <b class="num">${fmt(frais)} F</b></span><span>Débit total <b class="num">${fmt(cout+frais)} F</b></span></div>`;
+  }
+  function renderVentePreview(){
+    const code=document.getElementById('bvCode').value; const acct=brvmAcct(); const p=acct&&(acct.positions||[]).find(x=>x.code===code);
+    const q=+document.getElementById('bvQte').value||0, pu=+document.getElementById('bvPu').value||0, frais=+document.getElementById('bvFrais').value||0;
+    const el=document.getElementById('bvPreview'); if(!p||!q||!pu){ el.innerHTML=''; return; }
+    const brut=q*pu, net=brut-frais, pl=q*(pu-p.pru), plc=pl>=0?'up':'dn';
+    el.innerHTML=`<div class="brs-prev"><span>Produit brut <b class="num">${fmt(brut)} F</b></span><span>Net après frais <b class="num">${fmt(net)} F</b></span><span class="${plc}">+/- value réalisée <b class="num">${pl>=0?'+':'−'}${fmt(Math.abs(pl))} F</b></span></div>`;
+  }
+  function saveAchatForm(){
+    const code=document.getElementById('baCode').value.trim().toUpperCase();
+    const nom=document.getElementById('baNom').value.trim();
+    const q=+document.getElementById('baQte').value||0, pu=+document.getElementById('baPu').value||0;
+    const cours=+document.getElementById('baCours').value||pu, frais=+document.getElementById('baFrais').value||0;
+    const source=document.getElementById('baSource').value, date=document.getElementById('baDate').value.trim()||defaultOpDate();
+    if(!code||!q||!pu){ toast('Code, quantité et prix unitaire requis'); return; }
+    recordAchatTitre({date, source, code, nom:nom||code, quantite:q, prixUnitaire:pu, coursActuel:cours, frais});
+    closeBourseForms(); toast('Achat enregistré : '+q+' × '+code);
+  }
+  function saveDivForm(){
+    const code=document.getElementById('bdCode').value, montant=+document.getElementById('bdMontant').value||0;
+    const dest=document.getElementById('bdDest').value, date=document.getElementById('bdDate').value.trim()||defaultOpDate();
+    if(!code||!montant){ toast('Position et montant requis'); return; }
+    recordDividende({date, dest, code, montant});
+    closeBourseForms(); toast('Dividende enregistré : '+fmt(montant)+' F');
+  }
+  function saveVenteForm(){
+    const code=document.getElementById('bvCode').value, q=+document.getElementById('bvQte').value||0, pu=+document.getElementById('bvPu').value||0, frais=+document.getElementById('bvFrais').value||0;
+    const dest=document.getElementById('bvDest').value, date=document.getElementById('bvDate').value.trim()||defaultOpDate();
+    if(!code||!q||!pu){ toast('Position, quantité et prix requis'); return; }
+    const r=recordVenteTitre({date, dest, code, quantite:q, prixUnitaire:pu, frais});
+    closeBourseForms(); if(r) toast('Vente — +/- value '+(r.plReal>=0?'+':'−')+fmt(Math.abs(r.plReal))+' F');
+  }
+  function updateCours(code,val){
+    const acct=brvmRawAcct(); const p=acct&&(acct.positions||[]).find(x=>x.code===code);
+    if(p){ p.coursActuel=Number(val)||0; saveCycles(); refreshAll(); toast('Cours mis à jour : '+code); }
+  }
+  function renderBourse(){
+    const head=document.getElementById('bourseHead'); if(!head) return;
+    const acct=brvmAcct(); const positions=acct?(acct.positions||[]):[];
+    const valo=positions.reduce((s,p)=>s+(Number(p.quantite)||0)*(Number(p.coursActuel)||0),0);
+    const invest=positions.reduce((s,p)=>s+(Number(p.quantite)||0)*(Number(p.pru)||0),0);
+    const pl=valo-invest, plPct=invest>0?pl/invest*100:0, plc=pl>=0?'up':'dn';
+    const ops=collectBrvmOps(); const div=ops.filter(o=>o.type==='dividende').reduce((s,o)=>s+Math.abs(o.montant),0);
+    const rend=invest>0? div/invest*100:0;
+    const cash=brvmCashAcct(); const liq=cash?cash.solde:0;
+    head.innerHTML=`
+      <div class="brs-hero">
+        <div class="brs-hero-k">Valorisation du portefeuille</div>
+        <div class="brs-hero-v num">${fmt(valo)}<span class="cur">FCFA</span></div>
+        <div class="brs-hero-pl ${plc} num">${pl>=0?'+':'−'}${fmt(Math.abs(pl))} F · ${pl>=0?'+':'−'}${Math.abs(plPct).toFixed(1)}%</div>
+      </div>
+      <div class="brs-tiles">
+        <div class="brs-tile"><div class="k">Total investi</div><div class="v num">${fmt(invest)}<span class="cur">F</span></div></div>
+        <div class="brs-tile"><div class="k">+/- value latente</div><div class="v num ${plc}">${pl>=0?'+':'−'}${fmt(Math.abs(pl))}<span class="cur">F</span></div></div>
+        <div class="brs-tile"><div class="k">Dividendes encaissés</div><div class="v num">${fmt(div)}<span class="cur">F</span></div></div>
+        <div class="brs-tile"><div class="k">Rendement dividendes</div><div class="v num">${rend.toFixed(2)}<span class="cur">%</span></div></div>
+        <div class="brs-tile liq"><div class="k">Liquidités à investir${cash?' · '+cash.nom:''}</div><div class="v num">${fmt(liq)}<span class="cur">F</span></div></div>
+      </div>`;
+    const pw=document.getElementById('boursePositions');
+    pw.innerHTML = positions.length? positions.map(p=>{
+      const v=(Number(p.quantite)||0)*(Number(p.coursActuel)||0), c=(Number(p.quantite)||0)*(Number(p.pru)||0), ppl=v-c, pppct=c>0?ppl/c*100:0, cls=ppl>=0?'up':'dn';
+      const editing = bourseEditCours===p.code;
+      return `<div class="brs-card">
+        <div class="brs-card-h"><span class="brs-code">${p.code}</span><span class="brs-nom">${p.nom||''}</span><span class="brs-q num">×${p.quantite}</span></div>
+        <div class="brs-card-v"><div class="brs-card-valo num">${fmt(v)}<span class="cur">F</span></div><div class="brs-card-pl ${cls} num">${ppl>=0?'+':'−'}${fmt(Math.abs(ppl))} F · ${ppl>=0?'+':'−'}${Math.abs(pppct).toFixed(1)}%</div></div>
+        <div class="brs-card-m"><span>PRU <b class="num">${fmt(p.pru)}</b></span><span>Cours <b class="num">${fmt(p.coursActuel)}</b></span></div>
+        ${editing? `<div class="brs-cours-edit"><input type="number" id="brsCoursInput" value="${p.coursActuel}" min="0" step="1"><button class="btn btn-dark btn-sm" data-coursok="${p.code}">OK</button><button class="btn btn-ghost btn-sm" data-courscancel="1">✕</button></div>`
+          : `<div class="brs-card-act"><button class="btn btn-ghost btn-sm" data-cours="${p.code}">Mettre à jour le cours</button><button class="btn btn-ghost btn-sm" data-vendre="${p.code}">Vendre</button><button class="btn btn-ghost btn-sm" data-div="${p.code}">Recevoir dividende</button></div>`}
+      </div>`;
+    }).join('') : '<div class="vempty" style="padding:22px">Aucune position pour l’instant. Cliquez sur « Acheter un titre ».</div>';
+    pw.querySelectorAll('[data-cours]').forEach(b=>b.onclick=()=>{ bourseEditCours=b.dataset.cours; renderBourse(); const i=document.getElementById('brsCoursInput'); if(i){ i.focus(); i.select(); i.onkeydown=e=>{ if(e.key==='Enter'){ const v=+i.value; bourseEditCours=null; if(v>0) updateCours(b.dataset.cours,v); else renderBourse(); } else if(e.key==='Escape'){ bourseEditCours=null; renderBourse(); } }; } });
+    pw.querySelectorAll('[data-coursok]').forEach(b=>b.onclick=()=>{ const v=+document.getElementById('brsCoursInput').value; bourseEditCours=null; if(v>0) updateCours(b.dataset.coursok,v); else renderBourse(); });
+    pw.querySelectorAll('[data-courscancel]').forEach(b=>b.onclick=()=>{ bourseEditCours=null; renderBourse(); });
+    pw.querySelectorAll('[data-vendre]').forEach(b=>b.onclick=()=>openBourseForm('vente', b.dataset.vendre));
+    pw.querySelectorAll('[data-div]').forEach(b=>b.onclick=()=>openBourseForm('div', b.dataset.div));
+    const hw=document.getElementById('bourseHistory');
+    hw.innerHTML = ops.length? ops.map(o=>{
+      const t=o.type==='achat_titre'?'Achat':o.type==='vente_titre'?'Vente':'Dividende';
+      const cls=(o.type==='dividende'||o.type==='vente_titre')?'rev':'vir', sign=(o.type==='dividende'||o.type==='vente_titre')?'+':'−';
+      return `<div class="brs-hrow"><span class="brs-htag ${o.type}">${t}</span><div class="brs-hmain"><div class="brs-hlib">${o.lib}</div>${o.note?`<div class="brs-hnote">${o.note}</div>`:''}</div><div class="brs-hmeta"><span>${o.date} · ${o._month}</span><span class="brs-hcompte">${o.compte||''}</span></div><div class="brs-hamt ${cls}">${sign}${fmt(Math.abs(o.montant))}</div></div>`;
+    }).join('') : '<div class="vempty" style="padding:18px">Aucune opération boursière pour l’instant.</div>';
+  }
+
   /* ============================================================ DASHBOARD */
   function renderDash(){
     const k=liveKpis(); const added=newOps.length;
@@ -244,7 +377,7 @@
         : '<div class="vempty" style="padding:22px">Aucun revenu ce mois-ci pour l’instant.</div>';
     }
 
-    const groups=[{t:'Comptes disponibles',type:'disponible',pill:'dispo'},{t:'Coffres (épargne accessible)',type:'épargne',pill:'epargne'},{t:'Placements (BRVM)',type:'placement',pill:'placement'},{t:'Épargne bloquée',type:'bloqué',pill:'bloque'}];
+    const groups=[{t:'Comptes disponibles',type:'disponible',pill:'dispo'},{t:'Coffres (épargne accessible)',type:'épargne',pill:'epargne'},{t:'Épargne bloquée',type:'bloqué',pill:'bloque'}];
     const totalPatr=k.patrimoine||1;
     const accent={'disponible':'var(--orange)','épargne':'var(--blue)','bloqué':'var(--acier)','placement':'var(--violet)'};
     const ICON={
@@ -1107,7 +1240,7 @@
   /* ============================================================ misc */
   let toastT;
   function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800); }
-  function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); fillRevSelect(); renderHist(); }
+  function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); fillRevSelect(); renderHist(); renderBourse(); }
   function switchTab(name){
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
     document.querySelectorAll('.bn-item').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
@@ -1115,6 +1248,7 @@
     const p=document.getElementById('panel-'+name); if(p) p.classList.add('active');
     if(name==='hist') renderHist();
     if(name==='pilot') renderPilot();
+    if(name==='bourse') renderBourse();
     window.scrollTo({top:0,behavior:'instant'});
   }
   function initTabs(){
@@ -1124,19 +1258,18 @@
     const backdrop=document.getElementById('sheetBackdrop');
     const qa=document.getElementById('quickAddBtn');
     if(qa) qa.onclick=()=>{ switchTab('ops'); openForm(null); };
-    if(backdrop) backdrop.onclick=()=>{ closeForm(); closeXForm(); closeVentForm(); };
+    if(backdrop) backdrop.onclick=()=>{ closeForm(); closeXForm(); closeVentForm(); closeBourseForms(); };
+    const sheetIds=['opForm','xForm','ventForm','brsAchatForm','brsDivForm','brsVenteForm'];
     const obs=new MutationObserver(()=>{
-      const anyOpen = document.getElementById('opForm')?.classList.contains('open')
-        || document.getElementById('xForm')?.classList.contains('open')
-        || document.getElementById('ventForm')?.classList.contains('open');
+      const anyOpen = sheetIds.some(id=>document.getElementById(id)?.classList.contains('open'));
       document.body.classList.toggle('sheet-open', !!anyOpen);
     });
-    ['opForm','xForm','ventForm'].forEach(id=>{ const el=document.getElementById(id); if(el) obs.observe(el,{attributes:true,attributeFilter:['class']}); });
+    sheetIds.forEach(id=>{ const el=document.getElementById(id); if(el) obs.observe(el,{attributes:true,attributeFilter:['class']}); });
   }
   function init(){
     setActive(cycles.activeId);
     initTabs(); initQuickAdd(); fillCompteSelects(); buildMonthSelect();
-    renderDash(); renderOps(); renderCoffres(); renderVent(); fillRevSelect(); renderHist();
+    renderDash(); renderOps(); renderCoffres(); renderVent(); fillRevSelect(); renderHist(); renderBourse();
     document.getElementById('addBtn').onclick=()=>openForm(null);
     document.getElementById('xAddBtn').onclick=()=>openXForm('pay');
     document.getElementById('xDonBtn').onclick=()=>openXForm('don');
@@ -1160,6 +1293,18 @@
     document.querySelectorAll('#histSwitch .htab').forEach(b=>b.onclick=()=>setHistView(b.dataset.h));
     document.getElementById('monthSelect').onchange=e=>switchMonth(e.target.value);
     document.getElementById('newMonthBtn').onclick=newCycle;
+    // --- onglet Bourse (BRVM) ---
+    document.getElementById('brsAchatBtn').onclick=()=>openBourseForm('achat');
+    document.getElementById('brsDivBtn').onclick=()=>openBourseForm('div');
+    document.getElementById('brsVenteBtn').onclick=()=>openBourseForm('vente');
+    document.getElementById('baSave').onclick=saveAchatForm;
+    document.getElementById('baCancel').onclick=closeBourseForms;
+    document.getElementById('bdSave').onclick=saveDivForm;
+    document.getElementById('bdCancel').onclick=closeBourseForms;
+    document.getElementById('bvSave').onclick=saveVenteForm;
+    document.getElementById('bvCancel').onclick=closeBourseForms;
+    ['baQte','baPu','baFrais'].forEach(id=>document.getElementById(id).oninput=renderAchatPreview);
+    ['bvCode','bvQte','bvPu','bvFrais'].forEach(id=>{ const el=document.getElementById(id); el.oninput=renderVentePreview; el.onchange=renderVentePreview; });
     // API réutilisable pour les opérations sur titres (BRVM & autres placements).
     // Ex. : CaurisBRVM.achat({date:'JJ/MM', source:'Wave', code:'BOABF', nom:'BOA BF', quantite:3, prixUnitaire:5970, coursActuel:6050, frais:1154})
     window.CaurisBRVM = { achat:recordAchatTitre, dividende:recordDividende, vente:recordVenteTitre, ensure:ensurePlacement };
