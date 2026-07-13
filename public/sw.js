@@ -3,7 +3,7 @@
    - Navigation & app.js/sync.js : réseau d'abord (toujours à jour), cache en repli.
    - /api/* : réseau uniquement (données + authentification, jamais en cache).
 */
-const VERSION = "cauris-v3";
+const VERSION = "cauris-v4";
 const SHELL = "shell-" + VERSION;
 const RUNTIME = "runtime-" + VERSION;
 
@@ -63,8 +63,9 @@ self.addEventListener("fetch", (event) => {
   // Données & auth : jamais en cache.
   if (url.pathname.startsWith("/api/") || url.pathname === "/login") return;
 
-  // Logique applicative : toujours frais (réseau d'abord).
-  if (url.pathname === "/app.js" || url.pathname === "/sync.js") {
+  // Logique applicative + feuille de style (noms non hashés qui changent à
+  // chaque déploiement) : toujours frais (réseau d'abord, cache en repli hors-ligne).
+  if (url.pathname === "/app.js" || url.pathname === "/sync.js" || url.pathname === "/macaisse.css") {
     event.respondWith(networkFirst(req, RUNTIME));
     return;
   }
