@@ -74,6 +74,16 @@
 
   /* ---------- format ---------- */
   function fmt(n){ return Math.round(n).toLocaleString('fr-FR').replace(/\u00A0|\s/g,'\u202F'); }
+  function compactF(n){ n=Math.abs(Math.round(n)); if(n>=1e6) return (n/1e6).toFixed(2).replace('.',',')+' M'; if(n>=1e4) return Math.round(n/1e3)+' k'; return fmt(n); }
+  /* Anneau SVG segment\u00E9 (tranches espac\u00E9es, extr\u00E9mit\u00E9s nettes). */
+  function donutSVG(split, tot){
+    const R=42, C=2*Math.PI*R, gap=split.length>1?2.4:0; let off=0;
+    const rings=split.map(s=>{ const frac=(s.value>0?s.value:0)/tot; const len=Math.max(0, frac*C - gap);
+      const dashoff=-off; off+=frac*C;
+      return `<circle cx="50" cy="50" r="${R}" fill="none" stroke="${s.color}" stroke-width="10.5" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${dashoff.toFixed(2)}" transform="rotate(-90 50 50)"></circle>`;
+    }).join('');
+    return `<svg viewBox="0 0 100 100" class="donut-svg"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--fill)" stroke-width="10.5"></circle>${rings}</svg>`;
+  }
   function parseDate(d){ const m=(d||'').match(/(\d+)\/(\d+)/); return m? (+m[2])*100+(+m[1]) : 0; }
   function dayOfWeek(dd,mm,year){ const dows=['DIM','LUN','MAR','MER','JEU','VEN','SAM']; const dt=new Date(year, parseInt(mm,10)-1, parseInt(dd,10)); return dows[dt.getDay()]; }
   function hhmm(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
@@ -434,10 +444,10 @@
       {label:'Épargne bloquée', value:k.bloque, color:'var(--acier)'}
     ];
     if(k.placement>0) split.push({label:'Placements (BRVM)', value:k.placement, color:'var(--violet)'});
-    const tot=split.reduce((s,x)=>s+x.value,0)||1; let acc=0;
-    const segs=split.map(s=>{ const a=acc,b=acc+s.value/tot*100; acc=b; return `${s.color} ${a.toFixed(2)}% ${b.toFixed(2)}%`; }).join(', ');
-    document.getElementById('donut').style.background=`conic-gradient(${segs})`;
-    document.getElementById('donutCenter').innerHTML=`<b class="num">${fmt(k.patrimoine/1000)}k</b><span>FCFA</span>`;
+    const tot=split.reduce((s,x)=>s+x.value,0)||1;
+    const donutEl=document.getElementById('donut');
+    donutEl.classList.add('svg'); donutEl.style.background='none';
+    donutEl.innerHTML = donutSVG(split, tot) + `<div class="center" id="donutCenter"><b class="num">${compactF(k.patrimoine)}</b><span>Patrimoine · FCFA</span></div>`;
     document.getElementById('donutLegend').innerHTML=split.map(s=>{ const pct=s.value/tot*100; return `
       <div class="li">
         <span class="dot" style="background:${s.color}"></span>
