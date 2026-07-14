@@ -133,6 +133,27 @@
     const tauxEpargne = revenus>0 ? epargneNette/revenus : 0;
     return { patrimoine:dispo+coffres+bloque+placement, disponible:dispo, epargne:coffres+bloque, coffres, bloque, placement, depense, revenus, epargneNette, tauxEpargne, comptes:c };
   }
+  /* Patrimoine (Σ soldes comptes) d'un cycle = son ouverture + ses newOps.
+     Sert à calculer la variation du mois vs le mois précédent. */
+  function cyclePatrimoine(cid){
+    const cyc=cycles.months.find(m=>m.id===cid); if(!cyc) return null;
+    let openComptes;
+    if(cyc.seed) openComptes = S.comptes.map(c=>({nom:c.nom, solde:(c.type==='placement')?(c.positions||[]).reduce((s,p)=>s+(+p.quantite||0)*(+p.coursActuel||0),0):c.solde}));
+    else openComptes = (cyc.opening&&cyc.opening.comptes)||[];
+    const map={}; openComptes.forEach(c=>{ map[c.nom]={solde:+c.solde||0}; });
+    const b = (cid===M.id) ? {newOps} : loadBucket(cid);
+    (b.newOps||[]).forEach(o=>{ const a=Math.abs(o.montant), t=o.type;
+      if(t==='dépense'||t==='achat_titre'){ if(map[o.compte]) map[o.compte].solde-=a; }
+      else if(t==='revenu'||t==='dividende'||t==='vente_titre'){ if(map[o.compte]) map[o.compte].solde+=a; }
+      else if(t==='virement'){ if(map[o.compte]) map[o.compte].solde-=a; if(o.compteDest&&map[o.compteDest]) map[o.compteDest].solde+=a; }
+    });
+    return Object.values(map).reduce((s,c)=>s+c.solde,0);
+  }
+  function prevCycleId(){
+    const sorted=[...cycles.months].sort((a,b)=>(a.year*12+parseInt(a.mm,10))-(b.year*12+parseInt(b.mm,10)));
+    const idx=sorted.findIndex(m=>m.id===M.id);
+    return idx>0 ? sorted[idx-1].id : null;
+  }
   function liveCategories(){
     const map=baseCategories();
     newOps.filter(o=>o.type==='dépense').forEach(o=>{ const l=o.cat||'Divers'; map[l]=(map[l]||0)+Math.abs(o.montant); });
@@ -448,7 +469,19 @@
     const donutEl=document.getElementById('donut');
     donutEl.classList.add('svg'); donutEl.style.background='none';
     donutEl.innerHTML = donutSVG(split, tot) + `<div class="center" id="donutCenter"><b class="num">${compactF(k.patrimoine)}</b><span>Patrimoine · FCFA</span></div>`;
-    document.getElementById('donutLegend').innerHTML=split.map(s=>{ const pct=s.value/tot*100; return `
+    let deltaHTML='';
+    const prevId=prevCycleId();
+    if(prevId!=null){
+      const prev=cyclePatrimoine(prevId), diff=k.patrimoine-prev;
+      const pct=prev? diff/Math.abs(prev)*100 : 0;
+      const up=diff>=0, prevCyc=cycles.months.find(m=>m.id===prevId);
+      deltaHTML=`<div class="pat-delta ${up?'up':'down'}">
+        <span class="pd-arrow">${up?'▲':'▼'}</span>
+        <span class="pd-amt num">${up?'+':'−'}${fmt(Math.abs(diff))} F</span>
+        <span class="pd-pct num">${up?'+':'−'}${Math.abs(pct).toFixed(1)}%</span>
+        <span class="pd-ref">vs ${prevCyc?cap(prevCyc.monthName):'mois préc.'}</span></div>`;
+    }
+    document.getElementById('donutLegend').innerHTML=deltaHTML+split.map(s=>{ const pct=s.value/tot*100; return `
       <div class="li">
         <span class="dot" style="background:${s.color}"></span>
         <div class="li-main">

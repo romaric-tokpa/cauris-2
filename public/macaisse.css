@@ -209,6 +209,15 @@ body{
 .legend .li-bar{height:6px;background:var(--fill);border-radius:4px;overflow:hidden}
 .legend .li-bar i{display:block;height:100%;border-radius:4px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
 .legend .li .lp{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);min-width:44px;text-align:right;align-self:flex-start;margin-top:1px}
+.pat-delta{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 9px;padding:9px 11px;border-radius:9px;margin-bottom:6px;border:1px solid var(--line)}
+.pat-delta.up{background:rgba(31,138,91,.09);border-color:rgba(31,138,91,.28)}
+.pat-delta.down{background:rgba(200,67,27,.08);border-color:rgba(200,67,27,.26)}
+.pat-delta .pd-arrow{font-size:11px}
+.pat-delta.up .pd-arrow,.pat-delta.up .pd-amt{color:var(--green)}
+.pat-delta.down .pd-arrow,.pat-delta.down .pd-amt{color:var(--red)}
+.pat-delta .pd-amt{font-size:14px;font-weight:700;letter-spacing:-.02em}
+.pat-delta .pd-pct{font-size:11px;font-weight:700;color:var(--muted)}
+.pat-delta .pd-ref{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-left:auto}
 
 /* Category bars */
 .bars{display:flex;flex-direction:column;gap:9px}
