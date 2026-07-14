@@ -156,18 +156,30 @@
     if(!acct.positions) acct.positions=[];
     return acct;
   }
+  /* Historique des cours : un point {cours,date,ts} par relevé, par valeur.
+     Pas de doublon le même jour → on remplace le dernier point du jour. */
+  function pushPricePoint(acct, code, cours, date, ts){
+    if(!acct.priceHistory) acct.priceHistory={};
+    const arr = acct.priceHistory[code] || (acct.priceHistory[code]=[]);
+    const last = arr[arr.length-1];
+    if(last && last.date===date){ last.cours=Number(cours)||0; last.ts=ts; }
+    else arr.push({cours:Number(cours)||0, date, ts});
+    arr.sort((a,b)=>(a.ts||0)-(b.ts||0));
+  }
   /* Achat : sort le cash du compte source, crée/augmente la position (PRU moyen
-     pondéré, hors frais), enregistre les frais en dépense (cat "Frais"). */
+     pondéré, hors frais), enregistre les frais en dépense (cat "Frais").
+     Historise le prix d'achat comme premier point de cours de la valeur. */
   function recordAchatTitre(o){
     const acct=ensurePlacement(o.portefeuille||'Portefeuille BRVM');
     const qty=Number(o.quantite)||0, pu=Number(o.prixUnitaire)||0;
     let pos=acct.positions.find(p=>p.code===o.code);
     if(pos){ const totCost=pos.quantite*pos.pru + qty*pu; pos.quantite+=qty; pos.pru=pos.quantite? Math.round(totCost/pos.quantite*100)/100:0; if(o.coursActuel!=null) pos.coursActuel=Number(o.coursActuel); }
     else { pos={code:o.code, nom:o.nom||o.code, quantite:qty, pru:pu, coursActuel:o.coursActuel!=null?Number(o.coursActuel):pu}; acct.positions.push(pos); }
+    const ts=Date.now(), gid='t'+ts, cout=qty*pu, frais=Math.abs(Number(o.frais)||0);
+    pushPricePoint(acct, o.code, pu, o.date, ts);
     saveCycles();
-    const gid='t'+Date.now(), cout=qty*pu, frais=Math.abs(Number(o.frais)||0);
-    newOps.push({date:o.date, lib:'Achat '+qty+' × '+(o.nom||o.code), type:'achat_titre', compte:o.source, cat:'', montant:-cout, note:'PRU '+fmt(pu)+' · '+o.code, portefeuille:acct.nom, titre:o.code, _xlink:gid, _ts:Date.now(), _t:hhmm()});
-    if(frais>0) newOps.push({date:o.date, lib:'Frais — Achat '+o.code, type:'dépense', compte:o.source, cat:'Frais', montant:-frais, note:'Frais de courtage', _xlink:gid, _ts:Date.now()-1, _t:hhmm()});
+    newOps.push({date:o.date, lib:'Achat '+qty+' × '+(o.nom||o.code), type:'achat_titre', compte:o.source, cat:'', montant:-cout, note:'PRU '+fmt(pu)+' · '+o.code, portefeuille:acct.nom, titre:o.code, qte:qty, _xlink:gid, _ts:ts, _t:hhmm()});
+    if(frais>0) newOps.push({date:o.date, lib:'Frais — Achat '+o.code, type:'dépense', compte:o.source, cat:'Frais', montant:-frais, note:'Frais de courtage', _xlink:gid, _ts:ts-1, _t:hhmm()});
     persist(); refreshAll(); return pos;
   }
   /* Dividende : entre du cash en revenu (catégorie "Dividendes"), rattaché à une position. */
@@ -186,7 +198,7 @@
     pos.quantite-=qty; if(pos.quantite<=0) acct.positions=acct.positions.filter(p=>p!==pos);
     saveCycles();
     const gid='t'+Date.now();
-    newOps.push({date:o.date, lib:'Vente '+qty+' × '+(pos.nom||o.code), type:'vente_titre', compte:o.dest, cat:'', montant:brut, note:'Net '+fmt(net)+' F · +/- value '+(plReal>=0?'+':'−')+fmt(Math.abs(plReal))+' F', portefeuille:acct.nom, titre:o.code, plReal:plReal, _xlink:gid, _ts:Date.now(), _t:hhmm()});
+    newOps.push({date:o.date, lib:'Vente '+qty+' × '+(pos.nom||o.code), type:'vente_titre', compte:o.dest, cat:'', montant:brut, note:'Net '+fmt(net)+' F · +/- value '+(plReal>=0?'+':'−')+fmt(Math.abs(plReal))+' F', portefeuille:acct.nom, titre:o.code, qte:qty, plReal:plReal, _xlink:gid, _ts:Date.now(), _t:hhmm()});
     if(frais>0) newOps.push({date:o.date, lib:'Frais — Vente '+o.code, type:'dépense', compte:o.dest, cat:'Frais', montant:-frais, note:'Frais de courtage', _xlink:gid, _ts:Date.now()-1, _t:hhmm()});
     persist(); refreshAll(); return {plReal, net};
   }
@@ -275,7 +287,74 @@
   }
   function updateCours(code,val){
     const acct=brvmRawAcct(); const p=acct&&(acct.positions||[]).find(x=>x.code===code);
-    if(p){ p.coursActuel=Number(val)||0; saveCycles(); refreshAll(); toast('Cours mis à jour : '+code); }
+    if(p){ p.coursActuel=Number(val)||0; pushPricePoint(acct, code, Number(val)||0, defaultOpDate(), Date.now()); saveCycles(); refreshAll(); toast('Cours mis à jour : '+code); }
+  }
+  /* Quantité d'une valeur détenue à l'instant T (reconstituée depuis les ops). */
+  function brvmQtyHeldAt(ops, code, T){
+    let q=0; ops.forEach(o=>{ if(o.titre!==code || (o._ts||0)>T) return; if(o.type==='achat_titre') q+=Number(o.qte)||0; else if(o.type==='vente_titre') q-=Number(o.qte)||0; });
+    return q;
+  }
+  /* Série d'évolution : une valorisation reconstituée par date de relevé de cours. */
+  function portfolioSeries(){
+    const acct=brvmRawAcct(); if(!acct||!acct.priceHistory) return [];
+    const ph=acct.priceHistory, codes=Object.keys(ph);
+    const ops=collectBrvmOps();
+    const pru={}; (acct.positions||[]).forEach(p=>pru[p.code]=p.pru);
+    const events=[];
+    codes.forEach(code=>(ph[code]||[]).forEach(pt=>events.push({code, cours:pt.cours, date:pt.date, ts:pt.ts})));
+    events.sort((a,b)=>(a.ts||0)-(b.ts||0));
+    const lastCours={}; const samples=[];
+    events.forEach(ev=>{
+      lastCours[ev.code]=ev.cours;
+      let valo=0, invest=0;
+      codes.forEach(code=>{ const q=brvmQtyHeldAt(ops, code, ev.ts); if(q>0){ valo+=q*(lastCours[code]||0); invest+=q*(pru[code]!=null?pru[code]:(lastCours[code]||0)); } });
+      samples.push({date:ev.date, ts:ev.ts, valo, invest});
+    });
+    const out=[]; samples.forEach(s=>{ const prev=out[out.length-1]; if(prev && prev.date===s.date) out[out.length-1]=s; else out.push(s); });
+    return out;
+  }
+  function buildBrvmChart(series){
+    if(series.length<2){
+      return `<div class="brs-chartcard"><div class="brs-chart-t">Évolution du portefeuille</div>
+        <div class="brs-chart-empty">Mets à jour tes cours chaque mois pour voir ta courbe se construire.</div></div>`;
+    }
+    const W=1000,H=230,padL=58,padR=16,padT=16,padB=28, base=H-padB;
+    const n=series.length;
+    const vals=series.map(s=>s.valo).concat(series.map(s=>s.invest));
+    const maxY=Math.max(1,...vals), minY=Math.min(...vals), span=(maxY-minY)||maxY||1;
+    const lo=minY-span*0.12, hi=maxY+span*0.12, range=hi-lo||1;
+    const X=i=> padL+i*(W-padL-padR)/(n-1);
+    const Y=v=> base-(v-lo)/range*(H-padT-padB);
+    const up = series[n-1].valo>=series[0].valo;
+    const lineV=series.map((s,i)=>`${X(i).toFixed(1)},${Y(s.valo).toFixed(1)}`).join(' ');
+    const lineI=series.map((s,i)=>`${X(i).toFixed(1)},${Y(s.invest).toFixed(1)}`).join(' ');
+    const areaV=`M ${X(0).toFixed(1)},${base} L ${lineV} L ${X(n-1).toFixed(1)},${base} Z`;
+    const grid=[0,.5,1].map(f=>{ const y=(base-f*(H-padT-padB)).toFixed(1); return `<line class="grid" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line>`; }).join('');
+    const dotsV=series.map((s,i)=>`<circle class="brs-dot ${up?'up':'dn'}" cx="${X(i).toFixed(1)}" cy="${Y(s.valo).toFixed(1)}" r="4.5"></circle>`).join('');
+    const step=Math.ceil(n/6);
+    const xlbls=series.map((s,i)=> (i%step===0||i===n-1)? `<text class="xlbl" x="${X(i).toFixed(1)}" y="${H-8}" text-anchor="middle">${s.date}</text>`:'').join('');
+    return `<div class="brs-chartcard"><div class="brs-chart-head"><div class="brs-chart-t">Évolution du portefeuille</div>
+        <div class="brs-chart-leg"><span><i class="${up?'lv-up':'lv-dn'}"></i>Valorisation</span><span><i class="lv-inv"></i>Investi</span></div></div>
+      <svg class="brs-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
+        ${grid}
+        <line class="axis" x1="${padL}" y1="${padT}" x2="${padL}" y2="${base}"></line>
+        <line class="axis" x1="${padL}" y1="${base}" x2="${W-padR}" y2="${base}"></line>
+        <text class="ymax" x="${padL-8}" y="${padT+4}" text-anchor="end">${fmt(hi)}</text>
+        <text class="ymax" x="${padL-8}" y="${base}" text-anchor="end">${fmt(lo)}</text>
+        <path class="brs-area ${up?'up':'dn'}" d="${areaV}"></path>
+        <polyline class="brs-line-inv" points="${lineI}"></polyline>
+        <polyline class="brs-line ${up?'up':'dn'}" points="${lineV}"></polyline>
+        ${dotsV}${xlbls}
+      </svg></div>`;
+  }
+  function sparkline(pts){
+    if(!pts||pts.length<2) return '';
+    const w=110,h=26,p=2, xs=pts.map((_,i)=>p+i*(w-2*p)/(pts.length-1));
+    const ys=pts.map(pt=>pt.cours), mn=Math.min(...ys), mx=Math.max(...ys), sp=(mx-mn)||1;
+    const Y=v=>h-p-(v-mn)/sp*(h-2*p);
+    const line=pts.map((pt,i)=>`${xs[i].toFixed(1)},${Y(pt.cours).toFixed(1)}`).join(' ');
+    const up=ys[ys.length-1]>=ys[0];
+    return `<svg class="brs-spark ${up?'up':'dn'}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${line}"></polyline></svg>`;
   }
   function renderBourse(){
     const head=document.getElementById('bourseHead'); if(!head) return;
@@ -299,6 +378,9 @@
         <div class="brs-tile"><div class="k">Rendement dividendes</div><div class="v num">${rend.toFixed(2)}<span class="cur">%</span></div></div>
         <div class="brs-tile liq"><div class="k">Liquidités à investir${cash?' · '+cash.nom:''}</div><div class="v num">${fmt(liq)}<span class="cur">F</span></div></div>
       </div>`;
+    const chart=document.getElementById('bourseChart');
+    if(chart) chart.innerHTML=buildBrvmChart(portfolioSeries());
+    const rawAcct=brvmRawAcct();
     const pw=document.getElementById('boursePositions');
     pw.innerHTML = positions.length? positions.map(p=>{
       const v=(Number(p.quantite)||0)*(Number(p.coursActuel)||0), c=(Number(p.quantite)||0)*(Number(p.pru)||0), ppl=v-c, pppct=c>0?ppl/c*100:0, cls=ppl>=0?'up':'dn';
@@ -306,7 +388,7 @@
       return `<div class="brs-card">
         <div class="brs-card-h"><span class="brs-code">${p.code}</span><span class="brs-nom">${p.nom||''}</span><span class="brs-q num">×${p.quantite}</span></div>
         <div class="brs-card-v"><div class="brs-card-valo num">${fmt(v)}<span class="cur">F</span></div><div class="brs-card-pl ${cls} num">${ppl>=0?'+':'−'}${fmt(Math.abs(ppl))} F · ${ppl>=0?'+':'−'}${Math.abs(pppct).toFixed(1)}%</div></div>
-        <div class="brs-card-m"><span>PRU <b class="num">${fmt(p.pru)}</b></span><span>Cours <b class="num">${fmt(p.coursActuel)}</b></span></div>
+        <div class="brs-card-m"><span>PRU <b class="num">${fmt(p.pru)}</b></span><span>Cours <b class="num">${fmt(p.coursActuel)}</b></span>${(rawAcct&&rawAcct.priceHistory&&(rawAcct.priceHistory[p.code]||[]).length>1)?`<span class="brs-spark-wrap">${sparkline(rawAcct.priceHistory[p.code])}</span>`:''}</div>
         ${editing? `<div class="brs-cours-edit"><input type="number" id="brsCoursInput" value="${p.coursActuel}" min="0" step="1"><button class="btn btn-dark btn-sm" data-coursok="${p.code}">OK</button><button class="btn btn-ghost btn-sm" data-courscancel="1">✕</button></div>`
           : `<div class="brs-card-act"><button class="btn btn-ghost btn-sm" data-cours="${p.code}">Mettre à jour le cours</button><button class="btn btn-ghost btn-sm" data-vendre="${p.code}">Vendre</button><button class="btn btn-ghost btn-sm" data-div="${p.code}">Recevoir dividende</button></div>`}
       </div>`;
