@@ -707,22 +707,27 @@
     document.getElementById('fCompteDest').value=o&&o.compteDest?o.compteDest:'';
     document.getElementById('formTitle').textContent=(editIdx!=null)?(editIdx[0]==='a'?'Modifier l’opération importée':'Modifier l’opération'):'Nouvelle opération';
     document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':'';
-    document.getElementById('fDette').checked=false; document.getElementById('fEcheance').value=''; document.getElementById('fEchWrap').style.display='none';
+    setDetteToggle(false); document.getElementById('fEcheance').value='';
     syncType(); document.getElementById('fLib').focus();
   }
   document.addEventListener('change', e=>{
     if(e.target && e.target.id==='fCat'){ document.getElementById('fCatCustom').style.display = e.target.value==='__custom__' ? '' : 'none'; }
     if(e.target && e.target.id==='xCat'){ document.getElementById('xCatCustom').style.display = e.target.value==='__custom__' ? '' : 'none'; renderXPreview(); }
-    if(e.target && e.target.id==='fDette'){ document.getElementById('fEchWrap').style.display = e.target.checked ? '' : 'none'; }
   });
+  function setDetteToggle(on){
+    const b=document.getElementById('fDetteToggle'); if(!b) return;
+    b.setAttribute('aria-pressed', on?'true':'false');
+    b.classList.toggle('on', on);
+    document.getElementById('fEchWrap').style.display = on ? '' : 'none';
+  }
   function closeForm(){ document.getElementById('opForm').classList.remove('open'); editIdx=null; }
   function syncType(){ const t=document.getElementById('fType').value;
     document.getElementById('destWrap').style.display=(t==='virement')?'flex':'none';
     document.getElementById('catWrap').style.display=(t==='virement')?'none':'';
     document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':'';
     const showDette=(t==='dépense' && editIdx==null);
-    document.getElementById('fDetteWrap').style.display=showDette?'':'none';
-    if(!showDette){ document.getElementById('fDette').checked=false; document.getElementById('fEchWrap').style.display='none'; } }
+    document.getElementById('fDetteToggle').style.display=showDette?'':'none';
+    if(!showDette) setDetteToggle(false); }
   function saveForm(){
     const date=document.getElementById('fDate').value.trim();
     const lib=document.getElementById('fLib').value.trim();
@@ -759,7 +764,7 @@
     if(frais>0){ const gid='x'+Date.now(); op._xlink=gid; op._ts=Date.now(); op._t=hhmm(); newOps.push(op);
       newOps.push({date,lib:'Frais — '+lib,type:'dépense',compte,cat:'Frais',montant:-frais,note:'Frais de '+(type==='virement'?'virement':'transaction'),_xlink:gid,_ts:Date.now()-1,_t:hhmm()}); }
     else { op._ts=Date.now(); op._t=hhmm(); newOps.push(op); }
-    const asDette=type==='dépense' && document.getElementById('fDette').checked;
+    const asDette=type==='dépense' && document.getElementById('fDetteToggle').getAttribute('aria-pressed')==='true';
     if(asDette){ const ech=document.getElementById('fEcheance').value.trim(); const did='ud'+Date.now();
       if(!op._xlink) op._xlink=did;
       userDettes.push({id:did, nom:lib, montant:Math.abs(montant), retrait:date, echeance:ech||'à définir', paid:false, _xlink:op._xlink, manual:true}); }
@@ -1387,6 +1392,7 @@
     const pgSizeBtm=document.getElementById('opPageSizeBottom'); if(pgSizeBtm) pgSizeBtm.onchange=e=>{ opPageSize=parseInt(e.target.value,10); opPage=0; renderOps(); };
     document.getElementById('fCancel').onclick=closeForm;
     document.getElementById('fSave').onclick=saveForm;
+    document.getElementById('fDetteToggle').onclick=()=>setDetteToggle(document.getElementById('fDetteToggle').getAttribute('aria-pressed')!=='true');
     document.getElementById('fType').onchange=syncType;
     document.querySelectorAll('#fTypeSeg .typeopt').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#fTypeSeg .typeopt').forEach(x=>x.classList.remove('active')); b.classList.add('active'); document.getElementById('fType').value=b.dataset.t; syncType(); });
     document.getElementById('ventAddBtn').onclick=()=>openVentForm(null);

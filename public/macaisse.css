@@ -379,6 +379,13 @@ body{
 .xcheck{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:9px;margin-top:12px;font-size:13px;cursor:pointer;width:auto;max-width:100%}
 .xcheck input[type=checkbox]{width:16px!important;height:16px;min-width:16px;flex:0 0 16px;accent-color:var(--orange);margin:0}
 .xcheck span{flex:0 1 auto}
+.dette-toggle{display:inline-flex;align-items:center;gap:11px;margin-top:12px;padding:11px 15px;min-height:46px;border:1.5px solid var(--line-2);border-radius:9px;background:var(--paper);cursor:pointer;font-family:var(--sans);font-size:13.5px;color:var(--ink);text-align:left;transition:.14s;-webkit-tap-highlight-color:transparent;width:auto;max-width:100%}
+.dette-toggle .dt-box{width:22px;height:22px;min-width:22px;flex:0 0 22px;border:2px solid var(--line-2);border-radius:6px;background:#fff;position:relative;transition:.14s}
+.dette-toggle.on{border-color:var(--orange);background:rgba(226,84,26,.07)}
+.dette-toggle.on .dt-box{background:var(--orange);border-color:var(--orange)}
+.dette-toggle.on .dt-box::after{content:"";position:absolute;left:6px;top:2px;width:6px;height:11px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.dette-toggle:active{transform:scale(.98)}
+.dette-toggle .dt-lab{flex:0 1 auto}
 .xpreview{margin-top:16px;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:0 5px 5px 0;background:var(--paper);padding:14px 16px}
 .xp-empty{font-size:12.5px;color:var(--muted)}
 .xp-t{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);margin-bottom:11px}
