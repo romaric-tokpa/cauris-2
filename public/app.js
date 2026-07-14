@@ -707,17 +707,22 @@
     document.getElementById('fCompteDest').value=o&&o.compteDest?o.compteDest:'';
     document.getElementById('formTitle').textContent=(editIdx!=null)?(editIdx[0]==='a'?'Modifier l’opération importée':'Modifier l’opération'):'Nouvelle opération';
     document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':'';
+    document.getElementById('fDette').checked=false; document.getElementById('fEcheance').value=''; document.getElementById('fEchWrap').style.display='none';
     syncType(); document.getElementById('fLib').focus();
   }
   document.addEventListener('change', e=>{
     if(e.target && e.target.id==='fCat'){ document.getElementById('fCatCustom').style.display = e.target.value==='__custom__' ? '' : 'none'; }
     if(e.target && e.target.id==='xCat'){ document.getElementById('xCatCustom').style.display = e.target.value==='__custom__' ? '' : 'none'; renderXPreview(); }
+    if(e.target && e.target.id==='fDette'){ document.getElementById('fEchWrap').style.display = e.target.checked ? '' : 'none'; }
   });
   function closeForm(){ document.getElementById('opForm').classList.remove('open'); editIdx=null; }
   function syncType(){ const t=document.getElementById('fType').value;
     document.getElementById('destWrap').style.display=(t==='virement')?'flex':'none';
     document.getElementById('catWrap').style.display=(t==='virement')?'none':'';
-    document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':''; }
+    document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':'';
+    const showDette=(t==='dépense' && editIdx==null);
+    document.getElementById('fDetteWrap').style.display=showDette?'':'none';
+    if(!showDette){ document.getElementById('fDette').checked=false; document.getElementById('fEchWrap').style.display='none'; } }
   function saveForm(){
     const date=document.getElementById('fDate').value.trim();
     const lib=document.getElementById('fLib').value.trim();
@@ -728,7 +733,9 @@
     let montant=parseFloat(document.getElementById('fMontant').value);
     const note=document.getElementById('fNote').value.trim();
     const compteDest=document.getElementById('fCompteDest').value;
-    if(!lib||!montant||!date){ toast('Libellé, date et montant requis'); return; }
+    if(!lib){ toast('Renseigne le libellé'); return; }
+    if(!date){ toast('Renseigne la date'); return; }
+    if(!montant){ toast('Renseigne le montant'); return; }
     if(type==='virement' && !compteDest){ toast('Un virement exige un compte de destination'); return; }
     if(type==='virement' && compteDest===compte){ toast('Source et destination doivent différer'); return; }
     montant=Math.abs(montant)*(type==='dépense'?-1:1);
@@ -752,7 +759,11 @@
     if(frais>0){ const gid='x'+Date.now(); op._xlink=gid; op._ts=Date.now(); op._t=hhmm(); newOps.push(op);
       newOps.push({date,lib:'Frais — '+lib,type:'dépense',compte,cat:'Frais',montant:-frais,note:'Frais de '+(type==='virement'?'virement':'transaction'),_xlink:gid,_ts:Date.now()-1,_t:hhmm()}); }
     else { op._ts=Date.now(); op._t=hhmm(); newOps.push(op); }
-    persist(); closeForm(); refreshAll(); toast(frais>0?'Opération + frais ('+fmt(frais)+' F) ajoutés':'Opération ajoutée');
+    const asDette=type==='dépense' && document.getElementById('fDette').checked;
+    if(asDette){ const ech=document.getElementById('fEcheance').value.trim(); const did='ud'+Date.now();
+      if(!op._xlink) op._xlink=did;
+      userDettes.push({id:did, nom:lib, montant:Math.abs(montant), retrait:date, echeance:ech||'à définir', paid:false, _xlink:op._xlink, manual:true}); }
+    persist(); closeForm(); refreshAll(); toast(asDette?'Dépense ajoutée + dette à rembourser':(frais>0?'Opération + frais ('+fmt(frais)+' F) ajoutés':'Opération ajoutée'));
   }
 
   /* ---------- assistant opération croisée ---------- */
@@ -828,7 +839,16 @@
   function closeXForm(){ document.getElementById('xForm').classList.remove('open'); }
   function saveXForm(){
     const r=computeX();
-    if(!r.valid){ toast('Coût, libellé et compte requis (et montant tendu ≥ coût)'); return; }
+    if(!r.valid){
+      const lib=xVal('xLib'), cout=xNum('xCout'), from=document.getElementById('xFrom').value;
+      const recu=xMode==='don'?'':document.getElementById('xRecu').value, tendu=xNum('xTendu');
+      if(!lib) toast('Renseigne le libellé');
+      else if(!(cout>0)) toast('Renseigne le montant');
+      else if(!from) toast('Choisis le compte source');
+      else if(recu && tendu<cout) toast('Montant tendu ≥ coût requis (ou enlève « Monnaie reçue sur »)');
+      else toast('Formulaire incomplet');
+      return;
+    }
     r.lines.forEach(l=>newOps.push(l));
     if(r.dette) userDettes.push(r.dette);
     persist(); closeXForm(); refreshAll(); toast(r.lines.length+' écritures liées ajoutées');
@@ -910,7 +930,7 @@
         <span class="dmt num">${fmt(d.montant)} F</span><span class="statut ${paid?'ok':'todo'}">${paid?'✓ Remboursé':'À rembourser'}</span>
         <button class="iconbtn" data-dette="${i}">${paid?'Annuler':'Marquer payé'}</button></div>`;
     }).join('') + (userDettes||[]).map(d=>{
-      return `<div class="dette ${d.paid?'paid':''}"><div><div class="dn">${d.nom}<span class="grouptag">auto</span></div><div class="dmeta">Retrait ${d.retrait} · échéance ${d.echeance}</div></div>
+      return `<div class="dette ${d.paid?'paid':''}"><div><div class="dn">${d.nom}<span class="grouptag">${d.manual?'manuel':'auto'}</span></div><div class="dmeta">Retrait ${d.retrait} · échéance ${d.echeance}</div></div>
         <span class="dmt num">${fmt(d.montant)} F</span><span class="statut ${d.paid?'ok':'todo'}">${d.paid?'✓ Remboursé':'À rembourser'}</span>
         <button class="iconbtn" data-udette="${d.id}">${d.paid?'Annuler':'Marquer payé'}</button></div>`;
     }).join('');
