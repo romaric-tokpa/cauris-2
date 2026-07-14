@@ -1348,8 +1348,12 @@
     document.querySelectorAll('.bn-item').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
     document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
     const p=document.getElementById('panel-'+name); if(p) p.classList.add('active');
+    if(name==='dash') renderDash();
+    if(name==='ops') renderOps();
+    if(name==='coffres') renderCoffres();
     if(name==='hist') renderHist();
     if(name==='pilot') renderPilot();
+    if(name==='vent') renderVent();
     if(name==='bourse') renderBourse();
     window.scrollTo({top:0,behavior:'instant'});
   }
