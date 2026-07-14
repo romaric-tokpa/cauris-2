@@ -708,7 +708,10 @@
     document.getElementById('formTitle').textContent=(editIdx!=null)?(editIdx[0]==='a'?'Modifier l’opération importée':'Modifier l’opération'):'Nouvelle opération';
     document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':'';
     setDetteToggle(false); document.getElementById('fEcheance').value='';
-    syncType(); document.getElementById('fLib').focus();
+    syncType();
+    const ld = (o && o._xlink) ? userDettes.find(d=>d._xlink===o._xlink && d.manual) : null;
+    if(ld){ setDetteToggle(true); document.getElementById('fEcheance').value=(ld.echeance&&ld.echeance!=='à définir')?ld.echeance:''; }
+    document.getElementById('fLib').focus();
   }
   document.addEventListener('change', e=>{
     if(e.target && e.target.id==='fCat'){ document.getElementById('fCatCustom').style.display = e.target.value==='__custom__' ? '' : 'none'; }
@@ -720,12 +723,24 @@
     b.classList.toggle('on', on);
     document.getElementById('fEchWrap').style.display = on ? '' : 'none';
   }
+  /* Crée / met à jour / retire la dette manuelle liée à une opération (op._xlink). */
+  function applyDetteLink(op, on, montant, date, lib){
+    let link=op._xlink;
+    if(on && !link){ link='ud'+Date.now(); op._xlink=link; }
+    const ech=document.getElementById('fEcheance').value.trim();
+    const i = link ? userDettes.findIndex(d=>d._xlink===link && d.manual) : -1;
+    if(on){
+      const rec={ id: i>=0?userDettes[i].id:'ud'+Date.now(), nom:lib, montant:Math.abs(montant),
+        retrait:date, echeance:ech||'à définir', paid: i>=0?userDettes[i].paid:false, _xlink:link, manual:true };
+      if(i>=0) userDettes[i]=rec; else userDettes.push(rec);
+    } else if(i>=0){ userDettes.splice(i,1); }
+  }
   function closeForm(){ document.getElementById('opForm').classList.remove('open'); editIdx=null; }
   function syncType(){ const t=document.getElementById('fType').value;
     document.getElementById('destWrap').style.display=(t==='virement')?'flex':'none';
     document.getElementById('catWrap').style.display=(t==='virement')?'none':'';
     document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':'';
-    const showDette=(t==='dépense' && editIdx==null);
+    const showDette=(t==='dépense'||t==='virement');
     document.getElementById('fDetteToggle').style.display=showDette?'':'none';
     if(!showDette) setDetteToggle(false); }
   function saveForm(){
@@ -748,6 +763,8 @@
     const op={date,lib,type,compte,cat:type==='virement'?'':cat,montant,note};
     if(type==='virement'&&compteDest) op.compteDest=compteDest;
 
+    const asDette=(type==='dépense'||type==='virement') && document.getElementById('fDetteToggle').getAttribute('aria-pressed')==='true';
+
     if(editIdx!=null){
       const kind=editIdx[0], idx=+editIdx.slice(2);
       if(kind==='n'){ const p=newOps[idx]||{}; op._ts=p._ts||Date.now(); op._t=p._t||hhmm(); if(p._xlink) op._xlink=p._xlink; newOps[idx]=op;
@@ -758,17 +775,15 @@
         } else if(fi>=0){ newOps.splice(fi,1); }
       }
       else { opOverrides[idx]=op; if(opDeletes.includes(idx)) opDeletes=opDeletes.filter(x=>x!==idx); }
-      persist(); closeForm(); refreshAll(); toast('Opération modifiée');
+      applyDetteLink(op, asDette, montant, date, lib);
+      persist(); closeForm(); refreshAll(); toast(asDette?'Opération modifiée · dette à rembourser':'Opération modifiée');
       return;
     }
     if(frais>0){ const gid='x'+Date.now(); op._xlink=gid; op._ts=Date.now(); op._t=hhmm(); newOps.push(op);
       newOps.push({date,lib:'Frais — '+lib,type:'dépense',compte,cat:'Frais',montant:-frais,note:'Frais de '+(type==='virement'?'virement':'transaction'),_xlink:gid,_ts:Date.now()-1,_t:hhmm()}); }
     else { op._ts=Date.now(); op._t=hhmm(); newOps.push(op); }
-    const asDette=type==='dépense' && document.getElementById('fDetteToggle').getAttribute('aria-pressed')==='true';
-    if(asDette){ const ech=document.getElementById('fEcheance').value.trim(); const did='ud'+Date.now();
-      if(!op._xlink) op._xlink=did;
-      userDettes.push({id:did, nom:lib, montant:Math.abs(montant), retrait:date, echeance:ech||'à définir', paid:false, _xlink:op._xlink, manual:true}); }
-    persist(); closeForm(); refreshAll(); toast(asDette?'Dépense ajoutée + dette à rembourser':(frais>0?'Opération + frais ('+fmt(frais)+' F) ajoutés':'Opération ajoutée'));
+    applyDetteLink(op, asDette, montant, date, lib);
+    persist(); closeForm(); refreshAll(); toast(asDette?'Opération ajoutée + dette à rembourser':(frais>0?'Opération + frais ('+fmt(frais)+' F) ajoutés':'Opération ajoutée'));
   }
 
   /* ---------- assistant opération croisée ---------- */
