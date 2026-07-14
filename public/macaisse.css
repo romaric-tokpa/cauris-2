@@ -757,9 +757,8 @@ body{
 .sheet-backdrop{display:none;position:fixed;inset:0;background:rgba(28,32,37,.55);z-index:70;opacity:0;transition:opacity .2s}
 .bottomnav{display:none}
 .quickadd{display:none}
-body.sheet-open{overflow:hidden}
-
 @media(max-width:900px){
+  body.sheet-open{overflow:hidden}
   body{padding-bottom:78px}
   .wrap{padding-bottom:26px}
   .bottomnav{
