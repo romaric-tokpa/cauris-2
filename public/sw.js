@@ -3,7 +3,7 @@
    - Navigation & app.js/sync.js : réseau d'abord (toujours à jour), cache en repli.
    - /api/* : réseau uniquement (données + authentification, jamais en cache).
 */
-const VERSION = "cauris-v6";
+const VERSION = "cauris-v7";
 const SHELL = "shell-" + VERSION;
 const RUNTIME = "runtime-" + VERSION;
 

@@ -188,17 +188,22 @@ body{
 .card .ct::before{content:"";width:7px;height:7px;background:var(--orange);flex:none}
 
 /* Donut */
-.donut-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
-.donut{width:150px;height:150px;border-radius:50%;flex:none;position:relative}
-.donut::after{content:"";position:absolute;inset:26px;background:var(--paper);border-radius:50%}
+.donut-wrap{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+.donut{width:158px;height:158px;border-radius:50%;flex:none;position:relative;filter:drop-shadow(0 6px 16px rgba(28,32,37,.14))}
+.donut::after{content:"";position:absolute;inset:24px;background:var(--paper);border-radius:50%;box-shadow:inset 0 1px 3px rgba(28,32,37,.08)}
 .donut .center{position:absolute;inset:0;display:grid;place-items:center;text-align:center;z-index:1}
-.donut .center b{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:-.02em;display:block}
-.donut .center span{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.legend{display:flex;flex-direction:column;gap:11px;flex:1;min-width:170px}
-.legend .li{display:flex;align-items:center;gap:10px;font-size:12.5px}
-.legend .dot{width:11px;height:11px;border-radius:2px;flex:none}
-.legend .li .lv{margin-left:auto;font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:-.02em}
-.legend .li .lp{font-family:var(--mono);font-size:10px;color:var(--muted);width:38px;text-align:right}
+.donut .center b{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:-.03em;display:block;color:var(--ink)}
+.donut .center span{font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.legend{display:flex;flex-direction:column;gap:14px;flex:1;min-width:210px}
+.legend .li{display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:11px}
+.legend .dot{width:12px;height:12px;border-radius:3px;flex:none;align-self:flex-start;margin-top:3px}
+.legend .li-main{display:flex;flex-direction:column;gap:6px;min-width:0}
+.legend .li-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.legend .li-lab{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend .li .lv{font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:-.02em;flex:none}
+.legend .li-bar{height:6px;background:var(--fill);border-radius:4px;overflow:hidden}
+.legend .li-bar i{display:block;height:100%;border-radius:4px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.legend .li .lp{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);min-width:44px;text-align:right;align-self:flex-start;margin-top:1px}
 
 /* Category bars */
 .bars{display:flex;flex-direction:column;gap:9px}
@@ -603,14 +608,26 @@ body{
 .gauge-meta .gm b{color:var(--ink);letter-spacing:-.02em}
 .gauge-meta .gm-note{font-family:var(--sans);font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px}
 
-.trend{display:flex;flex-direction:column;gap:11px}
-.trend-bars{display:flex;align-items:flex-end;gap:5px;height:122px}
-.tcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end}
-.tbar{width:100%;background:var(--orange);border-radius:2px 2px 0 0;min-height:2px;transition:height .6s ease}
-.tcol:last-child .tbar{background:var(--anthracite)}
-.tcol .tlbl{font-family:var(--mono);font-size:8px;color:var(--muted);height:10px;line-height:1}
-.trend-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding-top:11px}
-.trend-foot b{color:var(--ink);letter-spacing:-.02em}
+/* Dépenses jour par jour — barres quotidiennes (hauts & bas) + ligne de moyenne */
+.dtrend{display:flex;flex-direction:column;gap:9px}
+.dtrend-plot{position:relative;height:128px}
+.dtrend-bars{display:flex;align-items:flex-end;gap:3px;height:100%}
+.dcol{flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center;min-width:0}
+.dbar{width:100%;border-radius:3px 3px 0 0;min-height:0;transition:height .55s cubic-bezier(.2,.8,.2,1)}
+.dbar.zero{height:0;min-height:3px;background:var(--line-2);opacity:.45;border-radius:2px}
+.dbar.lo{background:#F3C4AC}
+.dbar.hi{background:var(--orange)}
+.dbar.peak{background:var(--red)}
+.dtrend-avg{position:absolute;left:0;right:0;height:0;border-top:1px dashed var(--acier)}
+.dtrend-avg span{position:absolute;right:0;top:-13px;font-family:var(--mono);font-size:8.5px;font-weight:700;color:var(--acier);background:var(--paper);padding:0 5px;border-radius:3px}
+.dtrend-axis{display:flex;gap:3px}
+.dtrend-axis .dcell{flex:1;text-align:center;font-family:var(--mono);font-size:8px;color:var(--muted);line-height:1;min-width:0}
+.dtrend-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+.dtrend-foot b{color:var(--ink);letter-spacing:-.02em}
+.dtrend-leg{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:9px;letter-spacing:.02em;color:var(--muted)}
+.dtrend-leg span{display:inline-flex;align-items:center;gap:5px}
+.dtrend-leg i{width:9px;height:9px;border-radius:2px;flex:none}
+.dtrend-leg i.lg-peak{background:var(--red)}.dtrend-leg i.lg-hi{background:var(--orange)}.dtrend-leg i.lg-lo{background:#F3C4AC}
 
 /* ---------- Objectif coffre éditable (styles fusionnés dans .cf-edit ci-dessus) ---------- */
 
@@ -942,11 +959,14 @@ body{
   .donut-wrap{gap:14px;justify-content:center}
   .donut{width:118px;height:118px}
   .donut::after{inset:20px}
-  .donut .center b{font-size:12px}
+  .donut .center b{font-size:17px}
   .ring{width:104px;height:104px}
   .cf-ring{width:88px;height:88px}
   .gauge-wrap{gap:14px}
-  .legend .li,.donutLegend .li{font-size:11px}
+  .legend{min-width:0}
+  .legend .li-lab{font-size:11.5px}
+  .legend .li .lv{font-size:12px}
+  .legend .li .lp{min-width:38px;font-size:10px}
 
   /* Soldes par compte & barres */
   .acg-sub{font-size:13px}
@@ -1024,9 +1044,9 @@ body{
   transform-origin:left center;
   animation:growX .8s cubic-bezier(.2,.8,.2,1) both;
 }
-.trend-bars .tbar{transform-origin:bottom;animation:growY .6s cubic-bezier(.2,.8,.2,1) both}
-.trend-bars .tcol:nth-child(2n) .tbar{animation-delay:.03s}
-.trend-bars .tcol:nth-child(3n) .tbar{animation-delay:.06s}
+.dtrend-bars .dbar{transform-origin:bottom;animation:growY .55s cubic-bezier(.2,.8,.2,1) both}
+.dtrend-bars .dcol:nth-child(2n) .dbar{animation-delay:.02s}
+.dtrend-bars .dcol:nth-child(3n) .dbar{animation-delay:.05s}
 .cumchart .lineR,.cumchart .lineD{stroke-dasharray:2000;animation:dash 1.4s ease forwards}
 @keyframes dash{from{stroke-dashoffset:2000}to{stroke-dashoffset:0}}
 
@@ -1066,5 +1086,5 @@ body{
   .panel{display:block!important;page-break-before:always;animation:none}
   .panel:first-of-type{page-break-before:auto}
   .kpi,.card,.coffre,.dette,.regle,.bar-row,.acct,.feed-day,.op,.vcard,.heatcard,.hist-month,.coh{break-inside:avoid}
-  .kpi.dark,.callout,.topbar,.donut,.bar-fill,.cf-fill,.pill,.tcat,.op-mark,.vtable tfoot td,.foot .strip i,.kpi.dark::after,.ring,.tbar,.det-alert.todo,.seg-charge,.seg-coffre,.seg-coussin,.cf.done,.cf-won,.cf-won .medal,.vc-head,.vc-ring,.alloc-bar,.vl-mark,.hd-fill,.hm-fill,.hm-cur,.htab.active,.heatcell,.rev-dot,.coh .coh-badge .dot,.acct .delta,.acbadge,.acbar-f,.acg,.cf-hero,.cf-hero::after,.cf-ring,.cf-objbtn,.cf-tag,.statut{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .kpi.dark,.callout,.topbar,.donut,.bar-fill,.cf-fill,.pill,.tcat,.op-mark,.vtable tfoot td,.foot .strip i,.kpi.dark::after,.ring,.dbar,.det-alert.todo,.seg-charge,.seg-coffre,.seg-coussin,.cf.done,.cf-won,.cf-won .medal,.vc-head,.vc-ring,.alloc-bar,.vl-mark,.hd-fill,.hm-fill,.hm-cur,.htab.active,.heatcell,.rev-dot,.coh .coh-badge .dot,.acct .delta,.acbadge,.acbar-f,.acg,.cf-hero,.cf-hero::after,.cf-ring,.cf-objbtn,.cf-tag,.statut{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }

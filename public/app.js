@@ -438,9 +438,15 @@
     const segs=split.map(s=>{ const a=acc,b=acc+s.value/tot*100; acc=b; return `${s.color} ${a.toFixed(2)}% ${b.toFixed(2)}%`; }).join(', ');
     document.getElementById('donut').style.background=`conic-gradient(${segs})`;
     document.getElementById('donutCenter').innerHTML=`<b class="num">${fmt(k.patrimoine/1000)}k</b><span>FCFA</span>`;
-    document.getElementById('donutLegend').innerHTML=split.map(s=>`
-      <div class="li"><span class="dot" style="background:${s.color}"></span>${s.label}
-      <span class="lv num">${fmt(s.value)}</span><span class="lp">${(s.value/tot*100).toFixed(1)}%</span></div>`).join('');
+    document.getElementById('donutLegend').innerHTML=split.map(s=>{ const pct=s.value/tot*100; return `
+      <div class="li">
+        <span class="dot" style="background:${s.color}"></span>
+        <div class="li-main">
+          <div class="li-top"><span class="li-lab">${s.label}</span><span class="lv num">${fmt(s.value)}</span></div>
+          <div class="li-bar"><i style="width:${pct.toFixed(1)}%;background:${s.color}"></i></div>
+        </div>
+        <span class="lp num">${pct.toFixed(1)}%</span>
+      </div>`; }).join('');
 
     const cats=liveCategories(); const max=cats.length?cats[0].value:1;
     document.getElementById('catBars').innerHTML = cats.length? cats.map(c=>`
@@ -565,12 +571,30 @@
     let lastDay=0;
     allOps().filter(o=>o.type==='dépense' && String(o.date||'').endsWith('/'+mm)).forEach(o=>{ const dd=+String(o.date).split('/')[0]; if(dd>=1&&dd<=31){ days[dd]=(days[dd]||0)+Math.abs(o.montant); if(dd>lastDay) lastDay=dd; } });
     lastDay=Math.min(31,Math.max(lastDay, M.seed?15:10));
-    let cum=0; const cumVals=[]; let peakDay=1,peakVal=0;
-    for(let d=1;d<=lastDay;d++){ cum+=(days[d]||0); cumVals.push(cum); if((days[d]||0)>peakVal){peakVal=days[d];peakDay=d;} }
-    const total=cum, maxC=total||1;
-    const bars=cumVals.map((v,i)=>{ const d=i+1; const h=Math.max(2,v/maxC*100); return `<div class="tcol" title="${d}/${mm} — cumul ${fmt(v)} F"><div class="tbar" style="height:${h.toFixed(1)}%"></div><span class="tlbl">${d%2===1?d:''}</span></div>`; }).join('');
-    document.getElementById('trendBox').innerHTML=`<div class="trend"><div class="trend-bars">${bars}</div>
-      <div class="trend-foot"><span>Total <b class="num">${fmt(total)} F</b></span><span>Moy. <b class="num">${fmt(total/lastDay)} F</b>/j</span><span>${peakVal?('Pic le <b>'+peakDay+'/'+mm+'</b> · '+fmt(peakVal)+' F'):'—'}</span></div></div>`;
+    const vals=[]; let total=0, peakDay=0,peakVal=0, activeDays=0;
+    for(let d=1;d<=lastDay;d++){ const v=days[d]||0; vals.push(v); total+=v; if(v>peakVal){peakVal=v;peakDay=d;} if(v>0) activeDays++; }
+    const maxD=peakVal||1;
+    const avg=total/lastDay;
+    const avgPct=Math.min(100, avg/maxD*100);
+    const bars=vals.map((v,i)=>{ const d=i+1; const h=v>0?Math.max(4,v/maxD*100):0;
+      const cls = (v>0 && d===peakDay) ? 'peak' : (v>=avg && v>0 ? 'hi' : (v>0 ? 'lo' : 'zero'));
+      const tip = v>0 ? d+'/'+mm+' — '+fmt(v)+' F' : d+'/'+mm+' — aucune dépense';
+      return `<div class="dcol" title="${tip}"><div class="dbar ${cls}" style="height:${h.toFixed(1)}%"></div></div>`; }).join('');
+    const axis=vals.map((_,i)=>`<div class="dcell">${(i+1)%2===1?(i+1):''}</div>`).join('');
+    document.getElementById('trendBox').innerHTML=`<div class="dtrend">
+      <div class="dtrend-plot">
+        ${avg>0?`<div class="dtrend-avg" style="bottom:${avgPct.toFixed(1)}%"><span>moy. ${fmt(Math.round(avg))}/j</span></div>`:''}
+        <div class="dtrend-bars">${bars}</div>
+      </div>
+      <div class="dtrend-axis">${axis}</div>
+      <div class="dtrend-foot">
+        <span>Total <b class="num">${fmt(total)} F</b></span>
+        <span>Moy. <b class="num">${fmt(Math.round(avg))} F</b>/j</span>
+        <span>${peakVal?('Pic <b>'+peakDay+'/'+mm+'</b> · '+fmt(peakVal)+' F'):'—'}</span>
+        <span>${activeDays} j actifs</span>
+      </div>
+      <div class="dtrend-leg"><span><i class="lg-peak"></i>Jour le + dépensier</span><span><i class="lg-hi"></i>Au-dessus de la moyenne</span><span><i class="lg-lo"></i>En dessous</span></div>
+    </div>`;
   }
 
   /* ============================================================ OPÉRATIONS */
