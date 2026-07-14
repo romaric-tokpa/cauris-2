@@ -738,6 +738,28 @@
     } else if(i>=0){ userDettes.splice(i,1); }
   }
   function closeForm(){ document.getElementById('opForm').classList.remove('open'); editIdx=null; repayDetteId=null; }
+  /* Cycle (mois) correspondant à une date JJ/MM : le mois du même mm le plus proche
+     du mois actif (permet de porter un remboursement fait le mois suivant sur ce mois). */
+  function cycleIdForDate(date){
+    const mm=((date||'').split('/')[1]||'').padStart(2,'0');
+    if(!/^\d{2}$/.test(mm)) return M.id;
+    const cands=cycles.months.filter(c=>c.mm===mm);
+    if(!cands.length) return M.id;
+    const act=cycles.months.find(c=>c.id===M.id)||M;
+    const ak=act.year*12+parseInt(act.mm,10);
+    const key=c=>c.year*12+parseInt(c.mm,10);
+    cands.sort((a,b)=>Math.abs(key(a)-ak)-Math.abs(key(b)-ak));
+    return cands[0].id;
+  }
+  function monthLabel(id){ const c=cycles.months.find(x=>x.id===id); return c?c.label:id; }
+  function pushOpToMonth(targetId, op){
+    const b=loadBucket(targetId); b.newOps=b.newOps||[]; b.newOps.push(op);
+    try{ localStorage.setItem(bucketKey(targetId), JSON.stringify(b)); }catch(e){}
+  }
+  function removeOpFromMonth(targetId, pred){
+    const b=loadBucket(targetId); b.newOps=(b.newOps||[]).filter(o=>!pred(o));
+    try{ localStorage.setItem(bucketKey(targetId), JSON.stringify(b)); }catch(e){}
+  }
   /* Ouvre le form d'opération pré-rempli en REVENU pour rembourser une dette manuelle. */
   function openRepayForm(detteId){
     const d=(userDettes||[]).find(x=>x.id===detteId); if(!d) return;
@@ -803,9 +825,13 @@
     applyDetteLink(op, asDette, montant, date, lib);
     if(repayDetteId){
       const d=(userDettes||[]).find(x=>x.id===repayDetteId);
-      if(d){ d.paid=true; d.repayDate=date; }
       op._repay=repayDetteId;
-      persist(); closeForm(); refreshAll(); switchTab('coffres'); toast('Dette remboursée · revenu enregistré');
+      const targetId=cycleIdForDate(date);
+      let moved=false;
+      if(targetId!==M.id){ const k=newOps.indexOf(op); if(k>=0) newOps.splice(k,1); pushOpToMonth(targetId, op); moved=true; }
+      if(d){ d.paid=true; d.repayDate=date; d.repayMonth=targetId; }
+      persist(); closeForm(); refreshAll(); switchTab('coffres');
+      toast(moved ? 'Dette remboursée · revenu porté sur '+monthLabel(targetId) : 'Dette remboursée · revenu enregistré');
       return;
     }
     persist(); closeForm(); refreshAll(); toast(asDette?'Opération ajoutée + dette à rembourser':(frais>0?'Opération + frais ('+fmt(frais)+' F) ajoutés':'Opération ajoutée'));
@@ -983,7 +1009,10 @@
     document.querySelectorAll('[data-dette]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.dette; dettePaid[i]=!dettePaid[i]; persist(); renderCoffres(); toast(dettePaid[i]?'Dette marquée remboursée':'Statut réinitialisé'); });
     document.querySelectorAll('[data-udette]').forEach(b=>b.onclick=()=>{ const d=(userDettes||[]).find(x=>x.id===b.dataset.udette); if(!d) return;
       if(!d.paid){ openRepayForm(d.id); }
-      else { newOps=newOps.filter(o=>o._repay!==d.id); d.paid=false; delete d.repayDate; persist(); refreshAll(); toast('Remboursement annulé'); } });
+      else { const tid=d.repayMonth||M.id;
+        if(tid===M.id){ newOps=newOps.filter(o=>o._repay!==d.id); }
+        else { removeOpFromMonth(tid, o=>o._repay===d.id); }
+        d.paid=false; delete d.repayDate; delete d.repayMonth; persist(); refreshAll(); toast('Remboursement annulé'); } });
     document.getElementById('detteNote').textContent = M.seed? S.dettesNote : '';
     document.getElementById('detteNote').style.display = M.seed? '' : 'none';
 
