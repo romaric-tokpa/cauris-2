@@ -28,7 +28,7 @@
 
   /* ---------- active-month state ---------- */
   let M, newOps, dettePaid, ventilations, coffreOverrides, userDettes, opOverrides, opDeletes;
-  let ventEditId=null, editingCoffre=null, editIdx=null;
+  let ventEditId=null, editingCoffre=null, editIdx=null, repayDetteId=null;
   let filterText='', filterCat='', filterType='all';
   let opPage=0, opPageSize=25, xMode='pay';
   let histView='jour';
@@ -731,11 +731,29 @@
     const i = link ? userDettes.findIndex(d=>d._xlink===link && d.manual) : -1;
     if(on){
       const rec={ id: i>=0?userDettes[i].id:'ud'+Date.now(), nom:lib, montant:Math.abs(montant),
-        retrait:date, echeance:ech||'à définir', paid: i>=0?userDettes[i].paid:false, _xlink:link, manual:true };
+        retrait:date, echeance:ech||'à définir', paid: i>=0?userDettes[i].paid:false, _xlink:link, manual:true,
+        source: op.compte };
+      if(i>=0){ rec.paid=userDettes[i].paid; if(userDettes[i].repayDate) rec.repayDate=userDettes[i].repayDate; }
       if(i>=0) userDettes[i]=rec; else userDettes.push(rec);
     } else if(i>=0){ userDettes.splice(i,1); }
   }
-  function closeForm(){ document.getElementById('opForm').classList.remove('open'); editIdx=null; }
+  function closeForm(){ document.getElementById('opForm').classList.remove('open'); editIdx=null; repayDetteId=null; }
+  /* Ouvre le form d'opération pré-rempli en REVENU pour rembourser une dette manuelle. */
+  function openRepayForm(detteId){
+    const d=(userDettes||[]).find(x=>x.id===detteId); if(!d) return;
+    switchTab('ops'); openForm(null); repayDetteId=detteId;
+    document.getElementById('fType').value='revenu';
+    document.querySelectorAll('#fTypeSeg .typeopt').forEach(x=>x.classList.toggle('active',x.dataset.t==='revenu'));
+    document.getElementById('fMontant').value=d.montant;
+    document.getElementById('fLib').value='Remboursement — '+d.nom;
+    const cat=document.getElementById('fCat'); const known=[...cat.options].some(o=>o.value==='Remboursement');
+    if(known){ cat.value='Remboursement'; document.getElementById('fCatCustom').style.display='none'; }
+    const comptes=baseComptes().map(c=>c.nom);
+    if(d.source && comptes.includes(d.source)) document.getElementById('fCompte').value=d.source;
+    syncType();
+    document.getElementById('formTitle').textContent='Rembourser la dette';
+    document.getElementById('fLib').focus();
+  }
   function syncType(){ const t=document.getElementById('fType').value;
     document.getElementById('destWrap').style.display=(t==='virement')?'flex':'none';
     document.getElementById('catWrap').style.display=(t==='virement')?'none':'';
@@ -783,6 +801,13 @@
       newOps.push({date,lib:'Frais — '+lib,type:'dépense',compte,cat:'Frais',montant:-frais,note:'Frais de '+(type==='virement'?'virement':'transaction'),_xlink:gid,_ts:Date.now()-1,_t:hhmm()}); }
     else { op._ts=Date.now(); op._t=hhmm(); newOps.push(op); }
     applyDetteLink(op, asDette, montant, date, lib);
+    if(repayDetteId){
+      const d=(userDettes||[]).find(x=>x.id===repayDetteId);
+      if(d){ d.paid=true; d.repayDate=date; }
+      op._repay=repayDetteId;
+      persist(); closeForm(); refreshAll(); switchTab('coffres'); toast('Dette remboursée · revenu enregistré');
+      return;
+    }
     persist(); closeForm(); refreshAll(); toast(asDette?'Opération ajoutée + dette à rembourser':(frais>0?'Opération + frais ('+fmt(frais)+' F) ajoutés':'Opération ajoutée'));
   }
 
@@ -950,12 +975,15 @@
         <span class="dmt num">${fmt(d.montant)} F</span><span class="statut ${paid?'ok':'todo'}">${paid?'✓ Remboursé':'À rembourser'}</span>
         <button class="iconbtn" data-dette="${i}">${paid?'Annuler':'Marquer payé'}</button></div>`;
     }).join('') + (userDettes||[]).map(d=>{
-      return `<div class="dette ${d.paid?'paid':''}"><div><div class="dn">${d.nom}<span class="grouptag">${d.manual?'manuel':'auto'}</span></div><div class="dmeta">Retrait ${d.retrait} · échéance ${d.echeance}</div></div>
+      const meta = d.paid ? `Remboursé${d.repayDate?' le '+d.repayDate:''}` : `Retrait ${d.retrait} · échéance ${d.echeance}`;
+      return `<div class="dette ${d.paid?'paid':''}"><div><div class="dn">${d.nom}<span class="grouptag">${d.manual?'manuel':'auto'}</span></div><div class="dmeta">${meta}</div></div>
         <span class="dmt num">${fmt(d.montant)} F</span><span class="statut ${d.paid?'ok':'todo'}">${d.paid?'✓ Remboursé':'À rembourser'}</span>
         <button class="iconbtn" data-udette="${d.id}">${d.paid?'Annuler':'Marquer payé'}</button></div>`;
     }).join('');
     document.querySelectorAll('[data-dette]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.dette; dettePaid[i]=!dettePaid[i]; persist(); renderCoffres(); toast(dettePaid[i]?'Dette marquée remboursée':'Statut réinitialisé'); });
-    document.querySelectorAll('[data-udette]').forEach(b=>b.onclick=()=>{ const d=(userDettes||[]).find(x=>x.id===b.dataset.udette); if(d){ d.paid=!d.paid; persist(); renderCoffres(); toast(d.paid?'Dette marquée remboursée':'Statut réinitialisé'); } });
+    document.querySelectorAll('[data-udette]').forEach(b=>b.onclick=()=>{ const d=(userDettes||[]).find(x=>x.id===b.dataset.udette); if(!d) return;
+      if(!d.paid){ openRepayForm(d.id); }
+      else { newOps=newOps.filter(o=>o._repay!==d.id); d.paid=false; delete d.repayDate; persist(); refreshAll(); toast('Remboursement annulé'); } });
     document.getElementById('detteNote').textContent = M.seed? S.dettesNote : '';
     document.getElementById('detteNote').style.display = M.seed? '' : 'none';
 
