@@ -32,6 +32,9 @@
   let filterText='', filterCat='', filterType='all';
   let opPage=0, opPageSize=25, xMode='pay';
   let histView='jour';
+  /* Chaque onglet a sa propre URL (voir rewrites next.config.mjs). */
+  const TAB_ROUTES={ dash:'/', pilot:'/suivi', ops:'/operations', coffres:'/coffres', vent:'/ventilation', bourse:'/bourse' };
+  function tabFromPath(){ const p=(location.pathname||'/').replace(/\/+$/,'')||'/'; for(const t in TAB_ROUTES){ if(TAB_ROUTES[t]===p) return t; } return 'dash'; }
 
   function setActive(id){
     M = cycles.months.find(m=>m.id===id) || cycles.months[0];
@@ -1487,7 +1490,8 @@
   let toastT;
   function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800); }
   function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); fillRevSelect(); renderHist(); renderBourse(); }
-  function switchTab(name){
+  function switchTab(name, push){
+    if(push===undefined) push=true;
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
     document.querySelectorAll('.bn-item').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
     document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
@@ -1499,6 +1503,8 @@
     if(name==='pilot') renderPilot();
     if(name==='vent') renderVent();
     if(name==='bourse') renderBourse();
+    const path=TAB_ROUTES[name];
+    if(push && path && location.pathname!==path){ try{ history.pushState({tab:name}, '', path); }catch(e){} }
     window.scrollTo({top:0,behavior:'instant'});
   }
   function initTabs(){
@@ -1559,6 +1565,12 @@
     // API réutilisable pour les opérations sur titres (BRVM & autres placements).
     // Ex. : CaurisBRVM.achat({date:'JJ/MM', source:'Wave', code:'BOABF', nom:'BOA BF', quantite:3, prixUnitaire:5970, coursActuel:6050, frais:1154})
     window.CaurisBRVM = { achat:recordAchatTitre, dividende:recordDividende, vente:recordVenteTitre, ensure:ensurePlacement };
+    // Routage par onglet : active l'onglet de l'URL courante, normalise l'historique,
+    // et réagit aux boutons précédent/suivant du navigateur.
+    const initTab=tabFromPath();
+    switchTab(initTab, false);
+    try{ history.replaceState({tab:initTab}, '', TAB_ROUTES[initTab]||'/'); }catch(e){}
+    window.addEventListener('popstate', ()=>switchTab(tabFromPath(), false));
   }
   if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
 })();
