@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#E2541A"/>
+  <rect width="512" height="512" rx="112" fill="#1C2025"/>
   <g transform="translate(256 256) scale(4.3) translate(-35 -34.5)">
     <ellipse cx="35" cy="52" rx="26" ry="8" fill="#6C737B"/>
-    <ellipse cx="35" cy="40" rx="24" ry="8" fill="#1C2025"/>
+    <ellipse cx="35" cy="40" rx="24" ry="8" fill="#3C434C"/>
     <ellipse cx="35" cy="28" rx="20" ry="7" fill="#F2C200"/>
     <ellipse cx="35" cy="17" rx="15" ry="6" fill="#F5F3EF"/>
   </g>

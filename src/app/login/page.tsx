@@ -11,9 +11,9 @@ export default function LoginPage() {
       <form className="login-card" action={formAction}>
         <div className="login-brand">
           <div className="login-mark" aria-hidden>
-            <svg viewBox="0 0 70 66" width="30" height="28">
+            <svg viewBox="0 0 70 66" width="38" height="35">
               <ellipse cx="35" cy="52" rx="26" ry="8" fill="#6C737B" />
-              <ellipse cx="35" cy="40" rx="24" ry="8" fill="#1C2025" />
+              <ellipse cx="35" cy="40" rx="24" ry="8" fill="#3C434C" />
               <ellipse cx="35" cy="28" rx="20" ry="7" fill="#F2C200" />
               <ellipse cx="35" cy="17" rx="15" ry="6" fill="#F5F3EF" />
             </svg>

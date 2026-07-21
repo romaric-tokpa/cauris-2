@@ -29,10 +29,10 @@ body{
 .topbar .inner{max-width:1180px;margin:0 auto;padding:18px 26px 16px;display:flex;align-items:center;justify-content:space-between;gap:20px}
 .brand{display:flex;align-items:center;gap:14px}
 .brand .mark{
-  width:38px;height:38px;flex:none;border-radius:9px;background:var(--orange);
-  display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:15px;color:var(--anthracite);
-  letter-spacing:-.02em;
+  width:40px;height:40px;flex:none;background:none;
+  display:grid;place-items:center;
 }
+.brand .mark .brand-logo{display:block}
 .brand .logo{display:flex;align-items:baseline;gap:0;font-weight:900;font-size:21px;letter-spacing:-.03em;line-height:1}
 .brand .logo .bar{display:none}
 .brand .meta{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:rgba(245,243,239,.55);line-height:1.6;margin-top:3px}
@@ -1288,4 +1288,19 @@ body{
     border-radius:9px;background:var(--orange);color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;
     display:flex;align-items:center;justify-content:center;line-height:1}
   body.more-open{overflow:hidden}
+}
+
+/* ============================================================
+   Barre du bas = TÉLÉPHONE uniquement.
+   Sur tablette (641–900px) on la masque : la navigation se fait par
+   les onglets du haut (défilables). Corrige l'affichage encombré signalé.
+   ============================================================ */
+@media (min-width: 641px) and (max-width: 900px){
+  .bottomnav,
+  .quickadd,
+  .more-backdrop,
+  .moresheet{ display: none !important; }
+  body{ padding-bottom: 0; }
+  .wrap{ padding-bottom: 40px; }
+  body.more-open{ overflow: auto; }
 }

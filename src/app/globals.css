@@ -55,16 +55,14 @@ body {
 }
 
 .login-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--orange);
-  color: #fff;
+  width: 48px;
+  height: 48px;
+  background: none;
   display: grid;
   place-items: center;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  font-size: 17px;
+}
+.login-mark svg {
+  display: block;
 }
 
 .login-logo {
