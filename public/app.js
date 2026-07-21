@@ -771,7 +771,8 @@
       (b.newOps||[]).forEach(o=>{ if(o.type!=='dépense') return;
         if(nllwOf(o)){ kept++; return; }
         const d=nllwDefaultFor(o.cat);
-        if(d){ o.nllw=d; classified++; changed=true; } else ambiguous++;
+        // Bulk = acceptation délibérée du défaut -> marqué confirmé (ne pollue pas « à confirmer »).
+        if(d){ o.nllw=d; o.nllwConfirmed=true; classified++; changed=true; } else ambiguous++;
       });
       // 2) opérations importées (seed/archive) -> via opOverrides, indexées sur l'archive brute
       const arch = cyc.seed ? (S.operations||[]) : (cyc.archive||[]);
@@ -780,7 +781,7 @@
         const cur = ov[i] || o;
         if(nllwOf(cur)){ kept++; return; }
         const d=nllwDefaultFor(cur.cat);
-        if(d){ ov[i]=Object.assign({}, cur, {nllw:d}); classified++; changed=true; } else ambiguous++;
+        if(d){ ov[i]=Object.assign({}, cur, {nllw:d, nllwConfirmed:true}); classified++; changed=true; } else ambiguous++;
       });
       b.opOverrides=ov;
       if(isActive){ opOverrides=ov; if(changed) persist(); }
@@ -1731,24 +1732,69 @@
       card.setAttribute('role','button'); card.tabIndex=0; card.style.display='none';
       if(coh && coh.parentNode) coh.parentNode.insertBefore(card, coh.nextSibling);
     }
-    // Item dans la barre de navigation du bas (mobile), avant « Bourse ».
-    const bnav=document.getElementById('bottomNav');
-    if(bnav && !bnav.querySelector('[data-tab="equilibre"]')){
-      const it=document.createElement('button');
-      it.className='bn-item'; it.dataset.tab='equilibre';
-      it.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 8l7-5 7 5"/><path d="M4 8v3a8 8 0 0 0 16 0V8"/></svg><span>Équilibre</span><b class="bn-badge" id="bnEqBadge"></b>';
-      const bBourse=bnav.querySelector('[data-tab="bourse"]');
-      if(bBourse) bnav.insertBefore(it, bBourse); else bnav.appendChild(it);
-      it.onclick=()=>switchTab('equilibre');
-    }
   }
-  /* Pastille d'alerte (à classer + intentions à confirmer) sur l'onglet Équilibre. */
+
+  /* ============================================================
+     Navigation mobile (barre du bas) — 4 entrées max + bouton d'ajout central.
+     Accueil · Suivi · (＋) · Coffres · Plus. Le reste (Opérations, Budget,
+     Bourse, Équilibre, Sauvegardes) vit dans une feuille « Plus ».
+     ============================================================ */
+  const BN_PRIMARY=['dash','pilot','coffres'];
+  const BN_MORE=[
+    {tab:'ops',   label:'Opérations', icon:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.3"/><circle cx="3.5" cy="12" r="1.3"/><circle cx="3.5" cy="18" r="1.3"/>'},
+    {tab:'vent',  label:'Budget',     icon:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/>'},
+    {tab:'bourse',label:'Bourse',     icon:'<path d="M4 20V4M4 20h16"/><path d="M8 16l3.5-4 3 3L20 8"/>'},
+    {tab:'equilibre',label:'Équilibre',icon:'<path d="M12 3v18"/><path d="M5 8l7-5 7 5"/><path d="M4 8v3a8 8 0 0 0 16 0V8"/>', badge:'moreEqBadge'}
+  ];
+  const BN_ICONS={
+    dash:'<path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/>',
+    pilot:'<path d="M4 19V10M12 19V5M20 19v-6"/>',
+    coffres:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M8 6V4h8v2"/>',
+    more:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
+    backups:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>'
+  };
+  const bnSvg=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const BN_LABELS={dash:'Accueil',pilot:'Suivi',coffres:'Coffres'};
+  function setupMobileNav(){
+    const bnav=document.getElementById('bottomNav'); if(!bnav) return;
+    // Reconstruit la barre : 2 entrées · espace (FAB) · 2 entrées (dont « Plus »).
+    bnav.innerHTML =
+      BN_PRIMARY.slice(0,2).map(t=>`<button class="bn-item" data-tab="${t}">${bnSvg(BN_ICONS[t])}<span>${BN_LABELS[t]}</span></button>`).join('')+
+      '<span class="bn-spacer"></span>'+
+      `<button class="bn-item" data-tab="coffres">${bnSvg(BN_ICONS.coffres)}<span>${BN_LABELS.coffres}</span></button>`+
+      `<button class="bn-item" id="bnMoreBtn" type="button">${bnSvg(BN_ICONS.more)}<span>Plus</span><b class="bn-badge" id="bnMoreBadge"></b></button>`;
+    bnav.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ closeMoreSheet(); switchTab(b.dataset.tab); });
+    const more=document.getElementById('bnMoreBtn'); if(more) more.onclick=openMoreSheet;
+    buildMoreSheet();
+  }
+  function buildMoreSheet(){
+    if(document.getElementById('moreSheet')) return;
+    const bd=document.createElement('div'); bd.className='more-backdrop'; bd.id='moreBackdrop';
+    bd.onclick=closeMoreSheet;
+    const sheet=document.createElement('div'); sheet.className='moresheet'; sheet.id='moreSheet';
+    sheet.innerHTML =
+      '<div class="moresheet-grab"></div>'+
+      '<div class="moresheet-t">Plus</div>'+
+      '<div class="moregrid">'+
+        BN_MORE.map(m=>`<button class="moreitem" data-tab="${m.tab}">${bnSvg(m.icon)}<span>${m.label}</span>${m.badge?`<b class="more-badge" id="${m.badge}"></b>`:''}</button>`).join('')+
+        `<a class="moreitem" href="/backups">${bnSvg(BN_ICONS.backups)}<span>Sauvegardes</span></a>`+
+      '</div>';
+    document.body.appendChild(bd); document.body.appendChild(sheet);
+    sheet.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ const t=b.dataset.tab; closeMoreSheet(); switchTab(t); });
+  }
+  function openMoreSheet(){ const s=document.getElementById('moreSheet'), b=document.getElementById('moreBackdrop');
+    if(b) b.classList.add('show'); if(s) s.classList.add('open'); document.body.classList.add('more-open'); }
+  function closeMoreSheet(){ const s=document.getElementById('moreSheet'), b=document.getElementById('moreBackdrop');
+    if(b) b.classList.remove('show'); if(s) s.classList.remove('open'); document.body.classList.remove('more-open'); }
+
+  /* Pastille d'alerte (à classer + intentions à confirmer). */
   function updateNllwAlert(){
     const n = document.getElementById('panel-equilibre') ? nllwAlertCount() : 0;
     const top=document.querySelector('.tabs [data-tab="equilibre"]');
     if(top) top.classList.toggle('has-alert', n>0);
-    const badge=document.getElementById('bnEqBadge');
-    if(badge){ badge.textContent = n>0 ? (n>9?'9+':String(n)) : ''; badge.style.display = n>0 ? '' : 'none'; }
+    const txt = n>0 ? (n>9?'9+':String(n)) : '';
+    ['bnMoreBadge','moreEqBadge'].forEach(id=>{ const el=document.getElementById(id);
+      if(el){ el.textContent=txt; el.style.display = n>0 ? '' : 'none'; } });
   }
   /* Reclasse une opération précise (utilisé par « Intention à confirmer »). */
   function setOpNllw(key, val){
@@ -1858,6 +1904,9 @@
     if(push===undefined) push=true;
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
     document.querySelectorAll('.bn-item').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
+    const plusBtn=document.getElementById('bnMoreBtn');
+    if(plusBtn) plusBtn.classList.toggle('active', BN_MORE.some(m=>m.tab===name));
+    document.querySelectorAll('.moreitem').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
     document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
     const p=document.getElementById('panel-'+name); if(p) p.classList.add('active');
     if(name==='dash') renderDash();
@@ -1890,7 +1939,7 @@
   function init(){
     setActive(cycles.activeId);
     injectNllwUI(); injectEquilibreTab();
-    initTabs(); initQuickAdd(); fillCompteSelects(); buildMonthSelect();
+    initTabs(); setupMobileNav(); initQuickAdd(); fillCompteSelects(); buildMonthSelect();
     renderDash(); renderOps(); renderCoffres(); renderVent(); fillRevSelect(); renderHist(); renderBourse(); updateNllwAlert();
     document.getElementById('addBtn').onclick=()=>openForm(null);
     document.getElementById('xAddBtn').onclick=()=>openXForm('pay');
