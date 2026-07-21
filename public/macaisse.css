@@ -1304,3 +1304,11 @@ body{
   .wrap{ padding-bottom: 40px; }
   body.more-open{ overflow: auto; }
 }
+
+/* La feuille « Plus » et son voile n'existent QUE sur téléphone (≤640px).
+   Au-delà (tablette 13", desktop) ils n'ont aucun style de positionnement et
+   fuiteraient en clair dans la page — on les masque explicitement. */
+@media (min-width: 641px){
+  .more-backdrop,
+  .moresheet{ display: none !important; }
+}
