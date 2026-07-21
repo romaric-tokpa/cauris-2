@@ -24,6 +24,7 @@ const nextConfig = {
       { source: "/coffres", destination: "/" },
       { source: "/ventilation", destination: "/" },
       { source: "/bourse", destination: "/" },
+      { source: "/equilibre", destination: "/" },
     ];
   },
 };
