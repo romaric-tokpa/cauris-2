@@ -46,7 +46,8 @@
     'Provisions':'need','Santé':'need','Vêtements':'need','Soins perso':'need',
     'Frais':'need','Frais de transfert':'need','Prêt':'need','Prêt étudiant':'need',
     'Maison':'love','Copine':'love','Famille':'love','Aide famille':'love',
-    'Départ sœurs':'love','Outils/Web':'love','Transfert':'love','Autre':'love','Divers':'love'
+    'Départ sœurs':'love','Outils/Web':'love','Transfert':'love'
+    // « Autre » et « Divers » : volontairement non mappés (fourre-tout) — laissés à classer.
   };
   /* Catégories dont l'intention varie le plus : sélecteur gardé bien visible
      même sous le seuil (c'est là que Need vs Want se joue). */
@@ -607,7 +608,31 @@
         `</div></div>`;
     }).join('');
     document.querySelectorAll('#acctList [data-acct]').forEach(el=>{ const go=()=>{ filterText=el.dataset.acct; const sb=document.getElementById('opSearch'); if(sb) sb.value=filterText; filterCat=''; filterType='all'; document.querySelectorAll('#typeChips .typechip').forEach(x=>x.classList.toggle('active',x.dataset.type==='all')); opPage=0; document.querySelector('[data-tab=ops]').click(); renderOps(); const f=document.getElementById('opFeed'); if(f) f.scrollIntoView({block:'start'}); toast('Journal filtré : '+filterText); }; el.onclick=go; el.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }; });
-    renderCoherence(k); renderUrgence(); renderTrend();
+    renderCoherence(k); renderUrgence(); renderTrend(); renderDashNllw();
+  }
+
+  /* ---------- aperçu Équilibre sur le tableau de bord ---------- */
+  function renderDashNllw(){
+    const card=document.getElementById('dashNllw'); if(!card) return;
+    const st=getSettings(), b=nllwBreakdown();
+    if(b.total<=0){ card.style.display='none'; return; }
+    card.style.display='';
+    const ok=b.goodPct>=st.nllwTarget;
+    card.classList.toggle('ok', ok); card.classList.toggle('warn', !ok);
+    const alerts=b.noneCount + intentionToConfirm().length;
+    card.innerHTML=
+      '<div class="eqd-l">'+
+        '<div class="eqd-lab">Équilibre · Need + Love</div>'+
+        `<div class="eqd-val num">${b.goodPct.toFixed(0)}<span class="cur">%</span></div>`+
+        `<div class="eqd-sub">${ok?'✓ au-dessus de la cible':'sous la cible'} · objectif ${st.nllwTarget}%</div>`+
+      '</div>'+
+      '<div class="eqd-r">'+
+        eqSeg(b)+
+        `<div class="eqd-legend">${NLLW_KEYS.map(k=>`<span class="eq-leg"><i style="background:${NLLW_META[k].color}"></i>${NLLW_META[k].label}</span>`).join('')}${b.noneCount>0?`<span class="eq-leg"><i style="background:var(--line-2)"></i>À classer · ${b.noneCount}</span>`:''}</div>`+
+      '</div>'+
+      `<span class="eqd-go">${alerts>0?`<b class="eqd-badge">${alerts}</b> à traiter · `:''}Ouvrir →</span>`;
+    card.onclick=()=>switchTab('equilibre');
+    card.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); switchTab('equilibre'); } };
   }
 
   /* ---------- contrôle de cohérence ---------- */
@@ -703,6 +728,25 @@
     const goodPct = total>0 ? good/total*100 : 0;
     return { total, by, good, goodPct, unclassified, noneCount, deps };
   }
+  /* Répartition nllw d'un cycle quelconque (pour l'historique mois par mois). */
+  function cycleDepBreakdown(cid){
+    const cyc=cycles.months.find(m=>m.id===cid); if(!cyc) return null;
+    const isActive=cid===M.id;
+    const b = isActive ? {newOps, opOverrides, opDeletes} : loadBucket(cid);
+    const arch = cyc.seed ? (S.operations||[]) : (cyc.archive||[]);
+    const ov=b.opOverrides||{}, dels=b.opDeletes||[];
+    const by={need:0,love:0,like:0,want:0}; let total=0, unclassified=0;
+    const add=o=>{ if(!o||o.type!=='dépense') return; const k=nllwOf(o), a=Math.abs(o.montant);
+      total+=a; if(k&&by[k]!=null) by[k]+=a; else unclassified+=a; };
+    arch.forEach((o,i)=>{ if(dels.includes(i)) return; add(ov[i]||o); });
+    (b.newOps||[]).forEach(add);
+    const good=by.need+by.love;
+    return { cid, label:cyc.label, monthName:cyc.monthName, year:cyc.year, mm:cyc.mm,
+      by, total, good, unclassified, goodPct: total>0? good/total*100 : 0 };
+  }
+  /* Nb de points d'attention du mois courant (à classer + intentions à confirmer) — pour la pastille. */
+  function nllwAlertCount(){ const b=nllwBreakdown(); return b.noneCount + intentionToConfirm().length; }
+
   /* Dépenses > seuil laissées sur le défaut sans confirmation d'intention (mois courant). */
   function intentionToConfirm(){
     const th=getSettings().intentionThreshold;
@@ -1679,6 +1723,32 @@
         '<div id="eqRoot"></div>';
       if(main) main.appendChild(sec);
     }
+    // Aperçu sur le tableau de bord (inséré juste après le contrôle de cohérence).
+    if(!document.getElementById('dashNllw')){
+      const coh=document.getElementById('cohCard');
+      const card=document.createElement('div');
+      card.className='card eq-dash'; card.id='dashNllw';
+      card.setAttribute('role','button'); card.tabIndex=0; card.style.display='none';
+      if(coh && coh.parentNode) coh.parentNode.insertBefore(card, coh.nextSibling);
+    }
+    // Item dans la barre de navigation du bas (mobile), avant « Bourse ».
+    const bnav=document.getElementById('bottomNav');
+    if(bnav && !bnav.querySelector('[data-tab="equilibre"]')){
+      const it=document.createElement('button');
+      it.className='bn-item'; it.dataset.tab='equilibre';
+      it.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 8l7-5 7 5"/><path d="M4 8v3a8 8 0 0 0 16 0V8"/></svg><span>Équilibre</span><b class="bn-badge" id="bnEqBadge"></b>';
+      const bBourse=bnav.querySelector('[data-tab="bourse"]');
+      if(bBourse) bnav.insertBefore(it, bBourse); else bnav.appendChild(it);
+      it.onclick=()=>switchTab('equilibre');
+    }
+  }
+  /* Pastille d'alerte (à classer + intentions à confirmer) sur l'onglet Équilibre. */
+  function updateNllwAlert(){
+    const n = document.getElementById('panel-equilibre') ? nllwAlertCount() : 0;
+    const top=document.querySelector('.tabs [data-tab="equilibre"]');
+    if(top) top.classList.toggle('has-alert', n>0);
+    const badge=document.getElementById('bnEqBadge');
+    if(badge){ badge.textContent = n>0 ? (n>9?'9+':String(n)) : ''; badge.style.display = n>0 ? '' : 'none'; }
   }
   /* Reclasse une opération précise (utilisé par « Intention à confirmer »). */
   function setOpNllw(key, val){
@@ -1752,6 +1822,18 @@
           return `<div class="eq-confirm-row"><div class="eq-confirm-info"><span class="eq-confirm-lib">${o.lib}</span><span class="eq-confirm-amt num">${fmt(Math.abs(o.montant))} F</span></div>
             <div class="nllwseg eq-confirm-seg" data-key="${key}">${NLLW_KEYS.map(k=>`<button type="button" class="nllwopt nllw-${k} ${cur===k?'active':''}" data-v="${k}"><i style="background:${NLLW_META[k].color}"></i>${NLLW_META[k].label}</button>`).join('')}</div></div>`; }).join('')}</div></div>`;
     }
+    // Historique Need + Love mois par mois
+    const hist=[...cycles.months].sort((a,b)=>(a.year*12+parseInt(a.mm,10))-(b.year*12+parseInt(b.mm,10)))
+      .map(m=>cycleDepBreakdown(m.id)).filter(x=>x && x.total>0);
+    if(hist.length>1){
+      html+=`<div class="card eq-card"><div class="ct">Historique Need + Love · mois par mois</div>
+        <div class="eq-hist">${hist.map(h=>{ const p=h.goodPct, hit=p>=target, cur=h.cid===M.id;
+          return `<div class="eq-hist-row${cur?' current':''}">
+            <div class="eq-hist-m">${cap(h.monthName)} ${String(h.year).slice(2)}</div>
+            <div class="eq-hist-track"><i class="eq-hist-fill ${hit?'ok':'warn'}" style="width:${Math.min(100,p).toFixed(1)}%"></i><span class="eq-hist-target" style="left:${Math.min(100,target)}%"></span></div>
+            <div class="eq-hist-pct num ${hit?'ok':'warn'}">${p.toFixed(0)}%</div></div>`; }).join('')}</div>
+        <div class="eq-hist-legend"><span class="eq-hist-tick"></span>Le trait vertical marque la cible (${target}%).</div></div>`;
+    }
     // Réglages
     html+=`<div class="card eq-card"><div class="ct">Réglages de l’équilibre</div>
       <div class="eq-settings">
@@ -1771,7 +1853,7 @@
   /* ============================================================ misc */
   let toastT;
   function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800); }
-  function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); fillRevSelect(); renderHist(); renderBourse(); if(document.getElementById('panel-equilibre')) renderEquilibre(); }
+  function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); fillRevSelect(); renderHist(); renderBourse(); if(document.getElementById('panel-equilibre')) renderEquilibre(); updateNllwAlert(); }
   function switchTab(name, push){
     if(push===undefined) push=true;
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
@@ -1809,7 +1891,7 @@
     setActive(cycles.activeId);
     injectNllwUI(); injectEquilibreTab();
     initTabs(); initQuickAdd(); fillCompteSelects(); buildMonthSelect();
-    renderDash(); renderOps(); renderCoffres(); renderVent(); fillRevSelect(); renderHist(); renderBourse();
+    renderDash(); renderOps(); renderCoffres(); renderVent(); fillRevSelect(); renderHist(); renderBourse(); updateNllwAlert();
     document.getElementById('addBtn').onclick=()=>openForm(null);
     document.getElementById('xAddBtn').onclick=()=>openXForm('pay');
     document.getElementById('xDonBtn').onclick=()=>openXForm('don');
