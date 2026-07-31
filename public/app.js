@@ -69,7 +69,7 @@
 
   /* ---------- active-month state ---------- */
   let M, newOps, dettePaid, ventilations, coffreOverrides, userDettes, opOverrides, opDeletes;
-  let ventEditId=null, editingCoffre=null, editIdx=null, repayDetteId=null;
+  let ventEditId=null, editingCoffre=null, editIdx=null, repayDetteId=null, ventPicking=null;
   let fNllwValue='', fNllwTouched=false, fNllwConfirmPending=false;
   let filterText='', filterCat='', filterType='all';
   let opPage=0, opPageSize=25, xMode='pay';
@@ -1355,10 +1355,11 @@
     return comptes.find(c=>/urgence/i.test(c.nom))?.nom||"Coffre Fonds d'urgence (Djamo)"; }
   function bankAccount(){ const c=baseComptes().find(x=>/banque|sgbci/i.test(x.nom)); return c?c.nom:baseComptes()[0].nom; }
   function vDate(v){ return v.date || ('01/'+M.mm); }
-  function makeLinkOp(v,line,linkId){
+  function makeLinkOp(v,line,linkId,compte){
+    const acc=compte||bankAccount();
     if(line.type==='coussin') return null;
-    if(line.type==='charge') return { date:vDate(v), lib:line.poste, type:'dépense', compte:bankAccount(), cat:mapChargeCat(line.poste), montant:-Math.abs(line.montant), note:'Ventilation : '+v.label, _vlink:linkId, _ts:Date.now(), _t:hhmm() };
-    return { date:vDate(v), lib:line.poste, type:'virement', compte:bankAccount(), compteDest:matchCoffre(line.poste), cat:'', montant:Math.abs(line.montant), note:'Ventilation : '+v.label, _vlink:linkId, _ts:Date.now(), _t:hhmm() };
+    if(line.type==='charge') return { date:vDate(v), lib:line.poste, type:'dépense', compte:acc, cat:mapChargeCat(line.poste), montant:-Math.abs(line.montant), note:'Ventilation : '+v.label, _vlink:linkId, _ts:Date.now(), _t:hhmm() };
+    return { date:vDate(v), lib:line.poste, type:'virement', compte:acc, compteDest:matchCoffre(line.poste), cat:'', montant:Math.abs(line.montant), note:'Ventilation : '+v.label, _vlink:linkId, _ts:Date.now(), _t:hhmm() };
   }
 
   function renderVent(){
@@ -1416,12 +1417,25 @@
           else { budgetStatus='Dépassé de '+fmt(spent-budget)+' F'; budgetCls='over'; }
         }
         const icon = isCharge ? catIcon(cat) : TYPICON[l.type];
+        const vkey=v.id+'|'+i;
+        const needsCompte=!l.archived&&(l.type==='charge'||l.type==='coffre');
+        const picking=needsCompte&&!l.fait&&ventPicking===vkey;
+        const statCell = l.fait
+          ? `<button class="vstatbtn fait" data-vfait="${vkey}">✓ Fait</button>`
+          : picking
+            ? `<div class="vstatbtn vfait-picker">
+                <select data-vfaitcompte="${vkey}">${baseComptes().map(c=>`<option ${c.nom===bankAccount()?'selected':''}>${c.nom}</option>`).join('')}</select>
+                <button class="iconbtn" data-vfaitok="${vkey}" title="Valider">OK</button>
+                <button class="iconbtn" data-vfaitcancel="${vkey}" title="Annuler">✕</button>
+              </div>`
+            : `<button class="vstatbtn" data-vfait="${vkey}">Prévu</button>`;
         return `<div class="vline"><span class="vl-ic ${l.type}">${icon}</span>
           <div class="vl-main"><div class="vlp">${l.poste}${isCharge?`<span class="vl-cat">${cat}</span>`:''}</div>${l.note?`<div class="vln">${l.note}</div>`:''}${l.archived?'<div class="vln">déjà au journal ('+M.monthName+')</div>':(l.linkId?'<div class="vln" style="color:var(--green)">✓ inscrit au journal</div>':'')}
             ${isCharge?`<div class="vl-budget"><div class="vlb-track"><div class="vlb-fill ${budgetCls}" style="width:${Math.min(100,pctB).toFixed(1)}%"></div></div><span class="vlb-txt ${budgetCls}">${fmt(spent)} F dépensé / ${fmt(budget)} F alloué (catégorie) · ${budgetStatus}</span></div>`:''}
+            ${picking?`<div class="vln" style="color:var(--orange)">Choisissez le compte sur lequel ça a été fait</div>`:''}
           </div>
           <span class="vtype ${l.type}">${typeLabel(l.type)}</span><div class="vlm num">${fmt(l.montant)} F</div>
-          <button class="vstatbtn ${l.fait?'fait':''}" data-vfait="${v.id}|${i}">${l.fait?'✓ Fait':'Prévu'}</button>
+          ${statCell}
           <button class="iconbtn" data-vdel="${v.id}|${i}">Suppr.</button></div>`;
       }).join('');
       return `<div class="vcard">
@@ -1449,9 +1463,20 @@
     host.querySelectorAll('[data-vfait]').forEach(b=>b.onclick=()=>{
       const[id,i]=b.dataset.vfait.split('|'); const v=ventilations.find(x=>x.id===id); const line=v.lines[+i];
       if(line.archived){ line.fait=!line.fait; persistV(); renderVent(); return; }
-      if(!line.fait){ line.fait=true; const op=makeLinkOp(v,line,'vl'+Date.now()); if(op){ line.linkId=op._vlink; newOps.push(op); persist(); toast(op.type==='dépense'?'Fait — dépense ajoutée au journal':'Fait — virement ajouté au journal'); } else toast('Coussin gardé liquide sur la banque'); }
-      else { line.fait=false; if(line.linkId){ newOps=newOps.filter(o=>o._vlink!==line.linkId); line.linkId=null; persist(); toast('Annulé — opération retirée du journal'); } }
+      if(!line.fait){
+        if(line.type==='coussin'){ line.fait=true; toast('Coussin gardé liquide sur la banque'); persistV(); refreshAll(); renderVent(); return; }
+        ventPicking=id+'|'+i; renderVent(); return;
+      }
+      line.fait=false; if(line.linkId){ newOps=newOps.filter(o=>o._vlink!==line.linkId); line.linkId=null; persist(); toast('Annulé — opération retirée du journal'); }
       persistV(); refreshAll(); renderVent();
+    });
+    host.querySelectorAll('[data-vfaitcancel]').forEach(b=>b.onclick=()=>{ ventPicking=null; renderVent(); });
+    host.querySelectorAll('[data-vfaitok]').forEach(b=>b.onclick=()=>{
+      const[id,i]=b.dataset.vfaitok.split('|'); const v=ventilations.find(x=>x.id===id); const line=v.lines[+i];
+      const compte=host.querySelector(`[data-vfaitcompte="${id}|${i}"]`).value;
+      line.fait=true; const op=makeLinkOp(v,line,'vl'+Date.now(),compte); line.linkId=op._vlink; newOps.push(op); persist();
+      toast(op.type==='dépense'?'Fait — dépense ajoutée au journal':'Fait — virement ajouté au journal');
+      ventPicking=null; persistV(); refreshAll(); renderVent();
     });
     host.querySelectorAll('[data-vdel]').forEach(b=>b.onclick=()=>{ const[id,i]=b.dataset.vdel.split('|'); const v=ventilations.find(x=>x.id===id); const line=v.lines[+i]; if(line&&line.linkId){ newOps=newOps.filter(o=>o._vlink!==line.linkId); persist(); } v.lines.splice(+i,1); persistV(); refreshAll(); renderVent(); toast('Ligne retirée'); });
     host.querySelectorAll('[data-vadd]').forEach(b=>b.onclick=()=>{ const id=b.dataset.vadd; const v=ventilations.find(x=>x.id===id); const poste=host.querySelector(`[data-vaddposte="${id}"]`).value.trim(); const type=host.querySelector(`[data-vaddtype="${id}"]`).value; const m=parseFloat(host.querySelector(`[data-vaddmontant="${id}"]`).value); if(!poste||!m){ toast('Poste et montant requis'); return; } v.lines.push({poste,type,montant:Math.abs(m),fait:false}); persistV(); renderVent(); toast('Affectation ajoutée'); });

@@ -768,6 +768,10 @@ body{
 .vstatbtn{font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.01em;border-radius:5px;padding:7px 12px;cursor:pointer;border:1.5px solid var(--line-2);background:#fff;color:var(--ink);white-space:nowrap;transition:.12s}
 .vstatbtn:hover{border-color:var(--orange)}
 .vstatbtn.fait{background:var(--green);color:#fff;border-color:var(--green)}
+.vstatbtn.vfait-picker{display:flex;align-items:center;gap:6px;padding:0;border:0;background:none}
+.vfait-picker select{font-family:var(--sans);font-size:11.5px;font-weight:700;border:1.5px solid var(--orange);border-radius:5px;padding:6px 8px;background:#fff;color:var(--ink);max-width:150px}
+.vfait-picker select:focus{outline:none}
+.vfait-picker .iconbtn{padding:6px 9px}
 
 .vline-add{display:grid;grid-template-columns:1fr 150px 130px auto;gap:11px;align-items:end;padding:16px 0 4px;margin-top:6px;border-top:1.5px dashed var(--line-2)}
 @media(max-width:680px){.vline-add{grid-template-columns:1fr 1fr}}
