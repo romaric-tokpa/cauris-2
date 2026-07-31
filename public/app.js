@@ -25,6 +25,33 @@
   let cycles = load('macaisse-cycles-v1', null);
   if(!cycles){ cycles=defaultCycles(); migrateJune(); try{ localStorage.setItem('macaisse-cycles-v1',JSON.stringify(cycles)); }catch(e){} }
   function saveCycles(){ try{ localStorage.setItem('macaisse-cycles-v1',JSON.stringify(cycles)); }catch(e){} }
+  /* Migration ponctuelle : le portefeuille BRVM vivait auparavant dans
+     l'ouverture de chaque mois, donc perdu (positions, historique de cours)
+     à chaque passage au mois suivant. On le récupère dans cycles.placements,
+     global, une fois pour toutes. Idempotent : sans trace de compte
+     "placement" dans une ouverture de mois, ne fait rien. */
+  function migratePlacements(){
+    if(!cycles.placements) cycles.placements=[];
+    let changed=false;
+    const found={};
+    (cycles.months||[]).forEach(cyc=>{
+      const src=(cyc.opening&&cyc.opening.comptes)||[];
+      if(!src.some(c=>c.type==='placement')) return;
+      changed=true;
+      cyc.opening.comptes = src.filter(c=>{
+        if(c.type!=='placement') return true;
+        const existing=found[c.nom];
+        const richer = !existing
+          || (c.positions||[]).length>(existing.positions||[]).length
+          || Object.keys(c.priceHistory||{}).length>Object.keys(existing.priceHistory||{}).length;
+        if(richer) found[c.nom]=c;
+        return false;
+      });
+    });
+    Object.keys(found).forEach(nom=>{ if(!cycles.placements.find(p=>p.nom===nom)) cycles.placements.push(found[nom]); });
+    if(changed) saveCycles();
+  }
+  migratePlacements();
 
   /* ============================================================
      Cadre Need / Love / Like / Want (nllw)
@@ -96,7 +123,14 @@
 
   /* ---------- base providers (seed vs derived) ---------- */
   function positionsValue(c){ return (c.positions||[]).reduce((s,p)=>s+(Number(p.quantite)||0)*(Number(p.coursActuel)||0),0); }
-  function baseComptes(){ return (M.seed? S.comptes : M.opening.comptes).map(c=>{ const cc={...c}; if(c.positions) cc.positions=c.positions.map(p=>({...p})); if(cc.type==='placement') cc.solde=positionsValue(cc); return cc; }); }
+  /* Portefeuille(s) BRVM : globaux, indépendants du cycle actif (cf. section
+     PLACEMENTS plus bas). Un compte "placement" n'appartient à aucun mois. */
+  function globalPlacements(){ return cycles.placements || (cycles.placements=[]); }
+  function baseComptes(){
+    const monthComptes = (M.seed? S.comptes : M.opening.comptes).filter(c=>c.type!=='placement').map(c=>({...c}));
+    const placements = globalPlacements().map(c=>{ const cc={...c}; if(c.positions) cc.positions=c.positions.map(p=>({...p})); cc.solde=positionsValue(cc); return cc; });
+    return monthComptes.concat(placements);
+  }
   function baseCoffres(){ return (M.seed? S.coffres : M.opening.coffres).map(c=>({...c})); }
   function baseCategories(){ const m={}; archivedOps().forEach(o=>{ if(o.type==='dépense'){ const l=o.cat||'Divers'; m[l]=(m[l]||0)+Math.abs(o.montant); } }); return m; }
   function baseRevCategories(){ const m={}; if(M.seed && S.revCategories){ S.revCategories.forEach(x=>m[x.label]=x.value); } else { archivedOps().forEach(o=>{ if(o.type==='revenu'){ const l=o.cat||o.lib||'Divers'; m[l]=(m[l]||0)+Math.abs(o.montant); } }); } return m; }
@@ -183,8 +217,8 @@
   function cyclePatrimoine(cid){
     const cyc=cycles.months.find(m=>m.id===cid); if(!cyc) return null;
     let openComptes;
-    if(cyc.seed) openComptes = S.comptes.map(c=>({nom:c.nom, solde:(c.type==='placement')?(c.positions||[]).reduce((s,p)=>s+(+p.quantite||0)*(+p.coursActuel||0),0):c.solde}));
-    else openComptes = (cyc.opening&&cyc.opening.comptes)||[];
+    if(cyc.seed) openComptes = S.comptes.filter(c=>c.type!=='placement').map(c=>({nom:c.nom, solde:c.solde}));
+    else openComptes = ((cyc.opening&&cyc.opening.comptes)||[]).filter(c=>c.type!=='placement');
     const map={}; openComptes.forEach(c=>{ map[c.nom]={solde:+c.solde||0}; });
     const b = (cid===M.id) ? {newOps} : loadBucket(cid);
     (b.newOps||[]).forEach(o=>{ const a=Math.abs(o.montant), t=o.type;
@@ -192,7 +226,10 @@
       else if(t==='revenu'||t==='dividende'||t==='vente_titre'){ if(map[o.compte]) map[o.compte].solde+=a; }
       else if(t==='virement'){ if(map[o.compte]) map[o.compte].solde-=a; if(o.compteDest&&map[o.compteDest]) map[o.compteDest].solde+=a; }
     });
-    return Object.values(map).reduce((s,c)=>s+c.solde,0);
+    // Le portefeuille BRVM est global (indépendant du cycle) : sa valorisation
+    // actuelle s'ajoute au patrimoine de chaque cycle, comme dans baseComptes().
+    const placements = globalPlacements().reduce((s,c)=>s+positionsValue(c),0);
+    return Object.values(map).reduce((s,c)=>s+c.solde,0) + placements;
   }
   function prevCycleId(){
     const sorted=[...cycles.months].sort((a,b)=>(a.year*12+parseInt(a.mm,10))-(b.year*12+parseInt(b.mm,10)));
@@ -228,7 +265,9 @@
     for(let i=idx; i<sorted.length-1; i++){
       const cur=sorted[i], next=sorted[i+1];
       setActive(cur.id);
-      const closingComptes=liveComptes().map(c=>({nom:c.nom, solde:Math.round(c.solde), type:c.type, note:c.note||''}));
+      // Le portefeuille BRVM est global (cycles.placements) : on ne le reporte
+      // pas dans l'ouverture du mois suivant, sous peine de dupliquer le compte.
+      const closingComptes=liveComptes().filter(c=>c.type!=='placement').map(c=>({nom:c.nom, solde:Math.round(c.solde), type:c.type, note:c.note||''}));
       const closingCoffres=liveCoffres().map(c=>({nom:c.nom, epargne:Math.round(c.epargne), objectif:c.objectif, bloque:c.bloque, note:''}));
       next.opening = next.opening || {comptes:[], coffres:[]};
       next.opening.comptes = closingComptes;
@@ -246,10 +285,12 @@
      (valeur de marché), calculé dans baseComptes(). Les opérations ne
      déplacent que le CASH des comptes source/destination ; les titres
      eux-mêmes vivent dans les positions du compte placement.
+     Contrairement aux comptes courants, ce compte est global (cycles.placements,
+     cf. globalPlacements()) : même portefeuille quel que soit le mois actif,
+     passé ou futur — on n'ouvre pas une nouvelle Bourse à chaque cycle.
      ============================================================ */
-  function placementSource(){ return M.seed? S.comptes : M.opening.comptes; }
   function ensurePlacement(nom){
-    const src=placementSource();
+    const src=globalPlacements();
     let acct=src.find(c=>c.nom===nom);
     if(!acct){ acct={nom, type:'placement', solde:0, positions:[]}; src.push(acct); saveCycles(); }
     if(!acct.positions) acct.positions=[];
@@ -307,7 +348,7 @@
      ============================================================ */
   let bourseEditCours=null;
   function brvmAcct(){ return liveComptes().find(c=>c.type==='placement'); }
-  function brvmRawAcct(){ return (M.seed?S.comptes:M.opening.comptes).find(c=>c.type==='placement'); }
+  function brvmRawAcct(){ return globalPlacements().find(c=>c.type==='placement'); }
   function brvmCashName(){ const a=brvmRawAcct(); return a&&a.compteEspeces; }
   function brvmCashAcct(){ const n=brvmCashName(); return n? liveComptes().find(c=>c.nom===n):null; }
   function collectBrvmOps(){
@@ -1745,8 +1786,10 @@
     const mm=String(mi).padStart(2,'0'); const id=y+'-'+mm;
     if(cycles.months.find(m=>m.id===id)){ if(!confirm('Le cycle '+cap(MONTHS[mi-1])+' '+y+' existe déjà. Y aller ?')) return; switchMonth(id); return; }
     if(!confirm('Clôturer '+M.label+' et démarrer le cycle '+cap(MONTHS[mi-1])+' '+y+' ?\n\nLes soldes de comptes et coffres sont reportés comme point de départ. '+M.label+' reste consultable dans l’historique.')) return;
+    // Le portefeuille BRVM est global (cycles.placements) : pas reporté ici,
+    // sous peine de dupliquer le compte dans le nouveau cycle.
     const meta={ id, label:cap(MONTHS[mi-1])+' '+y, mm, year:y, monthName:MONTHS[mi-1], seed:false,
-      opening:{ comptes: closing.map(c=>({nom:c.nom,solde:Math.round(c.solde),type:c.type,note:c.note||''})), coffres: coffresClose } };
+      opening:{ comptes: closing.filter(c=>c.type!=='placement').map(c=>({nom:c.nom,solde:Math.round(c.solde),type:c.type,note:c.note||''})), coffres: coffresClose } };
     cycles.months.push(meta); saveCycles();
     try{ localStorage.setItem(bucketKey(id), JSON.stringify({newOps:[],dettePaid:{},ventilations:[],coffreOverrides:{...coffreOverrides}})); }catch(e){}
     switchMonth(id); toast('Nouveau cycle : '+meta.label);
@@ -1977,6 +2020,9 @@
     if(name==='equilibre') renderEquilibre();
     const path=TAB_ROUTES[name];
     if(push && path && location.pathname!==path){ try{ history.pushState({tab:name}, '', path); }catch(e){} }
+    // Mémorise le dernier onglet visité (local à l'appareil, jamais synchronisé
+    // — cf. tabFromPath au boot) pour le restaurer si l'app redémarre sur "/".
+    try{ localStorage.setItem('macaisse-lasttab', name); }catch(e){}
     window.scrollTo({top:0,behavior:'instant'});
   }
   function initTabs(){
@@ -2040,7 +2086,14 @@
     window.CaurisBRVM = { achat:recordAchatTitre, dividende:recordDividende, vente:recordVenteTitre, ensure:ensurePlacement };
     // Routage par onglet : active l'onglet de l'URL courante, normalise l'historique,
     // et réagit aux boutons précédent/suivant du navigateur.
-    const initTab=tabFromPath();
+    // Démarrage "à froid" sur la racine (icône PWA sur l'écran d'accueil : toujours
+    // start_url="/", quel que soit l'onglet quitté) → restaure le dernier onglet
+    // mémorisé plutôt que de retomber systématiquement sur l'accueil.
+    let initTab=tabFromPath();
+    if(initTab==='dash' && location.pathname.replace(/\/+$/,'')===''){
+      const last=load('macaisse-lasttab', null);
+      if(last && TAB_ROUTES[last] && last!=='dash') initTab=last;
+    }
     switchTab(initTab, false);
     try{ history.replaceState({tab:initTab}, '', TAB_ROUTES[initTab]||'/'); }catch(e){}
     window.addEventListener('popstate', ()=>switchTab(tabFromPath(), false));
