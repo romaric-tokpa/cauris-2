@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  let body: { key?: unknown; value?: unknown };
+  let body: { key?: unknown; value?: unknown; clientTs?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -32,7 +32,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "too_large" }, { status: 413 });
   }
 
-  const updatedAt = await putState(session.userId, key, value);
+  // Horodatage côté client (capturé avant l'envoi réseau) : sert à ordonner
+  // les écritures par émission plutôt que par arrivée — voir putState().
+  const clientTs = typeof body.clientTs === "number" && Number.isFinite(body.clientTs) ? body.clientTs : undefined;
+
+  const updatedAt = await putState(session.userId, key, value, clientTs);
   return NextResponse.json({ ok: true, updatedAt });
 }
 

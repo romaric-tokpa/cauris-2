@@ -29,6 +29,7 @@ async function ensureSchema(client: Client): Promise<void> {
          key        TEXT NOT NULL,
          value      TEXT NOT NULL,
          updated_at INTEGER NOT NULL,
+         client_ts  INTEGER NOT NULL DEFAULT 0,
          PRIMARY KEY (user_id, key)
        )`,
       `CREATE TABLE IF NOT EXISTS meta (
@@ -46,6 +47,14 @@ async function ensureSchema(client: Client): Promise<void> {
     ],
     "write",
   );
+
+  // Migration : les bases existantes n'ont pas encore la colonne client_ts
+  // (ajoutée pour empêcher une écriture réseau en retard d'écraser une plus
+  // récente — cf. le solde qui ne se répercutait plus après clôture).
+  const cols = await client.execute("PRAGMA table_info(state)");
+  if (!cols.rows.some((r) => r.name === "client_ts")) {
+    await client.execute("ALTER TABLE state ADD COLUMN client_ts INTEGER NOT NULL DEFAULT 0");
+  }
 
   // On stocke le cycle d'origine (seed) dans Turso pour qu'il soit la source
   // de vérité, versionnée. On ré-écrit si la version du seed change.
@@ -106,17 +115,43 @@ export async function getAllState(userId: string): Promise<StateRow[]> {
   }));
 }
 
-/** Écrit (upsert) une entrée d'état. */
-export async function putState(userId: string, key: string, value: string): Promise<number> {
+/**
+ * Écrit (upsert) une entrée d'état.
+ *
+ * `clientTs` (horodatage client, capturé au moment de l'écriture locale) sert
+ * de garde anti-régression : deux appareils peuvent écrire la même clé
+ * (ex. "cycles") en parallèle, et rien ne garantit que leurs requêtes
+ * arrivent au serveur dans l'ordre où elles ont été émises. Sans garde, une
+ * requête émise plus tôt mais arrivée en dernier écraserait un état plus
+ * récent. Le WHERE dans le UPSERT rend ce refus atomique côté SQLite.
+ */
+export async function putState(
+  userId: string,
+  key: string,
+  value: string,
+  clientTs?: number,
+): Promise<number> {
   const db = await getDb();
   const now = Date.now();
-  await db.execute({
-    sql: `INSERT INTO state (user_id, key, value, updated_at)
-          VALUES (?, ?, ?, ?)
+  const ts = Number.isFinite(clientTs) ? (clientTs as number) : now;
+  const r = await db.execute({
+    sql: `INSERT INTO state (user_id, key, value, updated_at, client_ts)
+          VALUES (?, ?, ?, ?, ?)
           ON CONFLICT(user_id, key) DO UPDATE
-            SET value = excluded.value, updated_at = excluded.updated_at`,
-    args: [userId, key, value, now],
+            SET value = excluded.value, updated_at = excluded.updated_at, client_ts = excluded.client_ts
+            WHERE excluded.client_ts >= state.client_ts`,
+    args: [userId, key, value, now, ts],
   });
+  // Écriture ignorée (plus ancienne que ce qui est déjà stocké) : on renvoie
+  // l'updated_at actuel plutôt que `now`, pour ne pas laisser croire au
+  // client que sa valeur a bien été persistée.
+  if (r.rowsAffected === 0) {
+    const cur = await db.execute({
+      sql: "SELECT updated_at FROM state WHERE user_id = ? AND key = ?",
+      args: [userId, key],
+    });
+    return Number(cur.rows[0]?.updated_at ?? now);
+  }
   return now;
 }
 

@@ -88,12 +88,16 @@
         } catch (e) {
           value = null;
         }
+        // Horodatage pris maintenant (état le plus récent qu'on connaisse pour
+        // cette clé) : permet au serveur de refuser une écriture plus ancienne
+        // arrivée en retard (deux appareils qui écrivent la même clé en //).
+        var clientTs = Date.now();
         inflight++;
         fetch("/api/state", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: srvKey, value: value }),
+          body: JSON.stringify({ key: srvKey, value: value, clientTs: clientTs }),
           keepalive: true,
         })
           .then(handleAuth)
