@@ -1364,14 +1364,23 @@
 
   function renderVent(){
     const host=document.getElementById('ventList'); const ov=document.getElementById('ventOverview');
-    if(!ventilations||!ventilations.length){ if(ov) ov.innerHTML=''; host.innerHTML='<div class="vempty">Aucune ventilation pour l’instant. À chaque revenu, cliquez sur « Nouvelle ventilation » pour le répartir avant de dépenser.</div>'; return; }
+    if(!ventilations||!ventilations.length){
+      if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+      host.innerHTML=`<div class="vempty">
+        <p>Aucune ventilation pour l'instant.</p>
+        <p class="vempty-sub">À chaque revenu, répartissez-le avant de dépenser : charges, coffres, coussins — le reste se calcule tout seul.</p>
+        <button class="btn btn-dark btn-sm" id="ventEmptyAddBtn">Créer ma première ventilation</button>
+      </div>`;
+      const eb=document.getElementById('ventEmptyAddBtn'); if(eb) eb.onclick=()=>openVentForm(null);
+      return;
+    }
     const totMontant=ventilations.reduce((s,v)=>s+v.montant,0);
     const totReparti=ventilations.reduce((s,v)=>s+v.lines.reduce((a,l)=>a+l.montant,0),0);
     const totFait=ventilations.reduce((s,v)=>s+v.lines.filter(l=>l.fait).reduce((a,l)=>a+l.montant,0),0);
-    if(ov) ov.innerHTML=`
+    if(ov){ ov.style.display=''; ov.innerHTML=`
       <div class="cfo-item"><span class="cfo-k">Revenus ventilés</span><span class="cfo-v num">${fmt(totMontant)}<span class="cur">F</span></span></div>
       <div class="cfo-item"><span class="cfo-k">Affecté</span><span class="cfo-v num">${fmt(totReparti)}<span class="cur">F</span></span></div>
-      <div class="cfo-item"><span class="cfo-k">Exécuté (au journal)</span><span class="cfo-v num" style="color:#7CD9AE">${fmt(totFait)}<span class="cur">F</span></span></div>`;
+      <div class="cfo-item"><span class="cfo-k">Exécuté (au journal)</span><span class="cfo-v num" style="color:#7CD9AE">${fmt(totFait)}<span class="cur">F</span></span></div>`; }
     const COL={charge:'var(--acier)',coffre:'var(--blue)',coussin:'var(--orange)'};
     const TYPICON={charge:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
       coffre:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M12 9v0"></path></svg>',
@@ -1438,8 +1447,9 @@
           ${statCell}
           <button class="iconbtn" data-vdel="${v.id}|${i}">Suppr.</button></div>`;
       }).join('');
-      return `<div class="vcard">
-        <div class="vc-head"><div class="vc-id"><div class="vc-label">${v.label}</div><div class="vc-date">${v.date||''}</div></div>
+      const allFait=v.lines.length>0&&v.lines.every(l=>l.fait);
+      return `<div class="vcard" style="border-top-color:${ringCol}">
+        <div class="vc-head"><div class="vc-id"><div class="vc-label">${v.label}${allFait?'<span class="vc-done-badge">✓ Exécutée</span>':''}</div><div class="vc-date">${v.date||''}</div></div>
           <div class="vc-money"><div class="vm num">${fmt(v.montant)} F</div><div class="vmk">à ventiler</div></div>
           <div class="vc-acts"><button class="iconbtn" data-vedit="${v.id}">Modif.</button><button class="iconbtn" data-vdelcard="${v.id}">Suppr.</button></div></div>
         <div class="vc-top">

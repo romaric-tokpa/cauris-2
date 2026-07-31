@@ -784,6 +784,10 @@ body{
 .vcard-foot span b{color:var(--ink);letter-spacing:-.02em;font-size:13px}
 
 .vempty{background:var(--paper);border:1.5px dashed var(--line-2);border-radius:8px;padding:40px;text-align:center;color:var(--muted);font-size:13.5px}
+.vempty p{margin:0 0 6px;line-height:1.5}
+.vempty .vempty-sub{font-size:12.5px;max-width:420px;margin-left:auto;margin-right:auto}
+.vempty .btn{margin-top:16px}
+.vc-done-badge{display:inline-block;margin-left:10px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green);background:rgba(31,138,91,.12);border:1px solid rgba(31,138,91,.35);border-radius:20px;padding:3px 9px;vertical-align:middle}
 
 /* ---------- Footer ---------- */
 .foot{max-width:1180px;margin:0 auto;padding:0 26px 50px;display:flex;justify-content:space-between;align-items:center;gap:14px;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
