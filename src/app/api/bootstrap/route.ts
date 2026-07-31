@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getAllState, getSeed } from "@/lib/db";
+import { APP_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -24,5 +25,5 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ seed, state });
+  return NextResponse.json({ seed, state, version: APP_VERSION });
 }

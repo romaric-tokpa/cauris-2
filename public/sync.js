@@ -230,6 +230,53 @@
     document.body.appendChild(s);
   }
 
+  /* ---------- détection d'onglet périmé ----------
+     Un onglet resté ouvert depuis avant un déploiement fait tourner un ancien
+     app.js qui ignore les champs de données ajoutés depuis (ex. cycles.placements)
+     et peut, en sauvegardant, écraser silencieusement un état plus récent par
+     une structure obsolète — déjà arrivé deux fois. On compare la version avec
+     laquelle cet onglet a démarré à celle du serveur, régulièrement, et on
+     avertit sans bloquer les écritures en cours (perdre l'édition la plus
+     récente serait pire que le risque restant). */
+  var bootVersion = null;
+  function showStaleBanner() {
+    if (document.getElementById("cauris-stale-banner")) return;
+    var bar = document.createElement("div");
+    bar.id = "cauris-stale-banner";
+    bar.setAttribute(
+      "style",
+      "position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;" +
+        "font:14px/1.4 -apple-system,system-ui,sans-serif;padding:10px 14px;display:flex;" +
+        "gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;text-align:center;" +
+        "box-shadow:0 2px 8px rgba(0,0,0,.25)",
+    );
+    bar.innerHTML =
+      "<span>Nouvelle version disponible — rechargez pour éviter que cet onglet n'écrase des données plus récentes.</span>" +
+      '<button type="button" style="background:#fff;color:#c0392b;border:none;border-radius:6px;padding:6px 12px;font-weight:600;cursor:pointer">Recharger</button>';
+    bar.querySelector("button").onclick = function () {
+      window.location.reload();
+    };
+    document.body.appendChild(bar);
+  }
+  function checkVersion() {
+    if (!bootVersion) return;
+    fetch("/api/version", { credentials: "same-origin" })
+      .then(function (res) {
+        return res.ok ? res.json() : null;
+      })
+      .then(function (data) {
+        if (data && data.version && data.version !== bootVersion) showStaleBanner();
+      })
+      .catch(noop);
+  }
+  function installVersionWatch() {
+    setInterval(checkVersion, 45000);
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") checkVersion();
+    });
+    window.addEventListener("focus", checkVersion);
+  }
+
   function boot() {
     installStorageProxy();
     fetch("/api/bootstrap", { credentials: "same-origin" })
@@ -244,8 +291,10 @@
       .then(function (data) {
         if (!data) return;
         window.MACAISSE = data.seed;
+        bootVersion = data.version || null;
         hydrate(data.state);
         loadApp();
+        installVersionWatch();
       })
       .catch(function (err) {
         console.error("[Cauris] bootstrap échoué", err);
