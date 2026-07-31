@@ -90,7 +90,7 @@
     opOverrides = b.opOverrides||{};
     opDeletes = b.opDeletes||[];
   }
-  function saveBucket(){ try{ localStorage.setItem(bucketKey(M.id), JSON.stringify({newOps,dettePaid,ventilations,coffreOverrides,userDettes,opOverrides,opDeletes})); }catch(e){} }
+  function saveBucket(){ try{ localStorage.setItem(bucketKey(M.id), JSON.stringify({newOps,dettePaid,ventilations,coffreOverrides,userDettes,opOverrides,opDeletes})); }catch(e){} resyncOpeningsFrom(M.id); }
   const persist=saveBucket, persistV=saveBucket, persistCoffres=saveBucket;
   function coffreObjectif(c){ const o=coffreOverrides[c.nom]; return (o!=null&&o>0)?o:c.objectif; }
 
@@ -213,6 +213,29 @@
   function liveCoffres(){
     const comptes=liveComptes();
     return baseCoffres().map(c=>{ const acct=comptes.find(a=>normName(a.nom)===normName(c.nom)); return {...c, epargne: acct?acct.solde:c.epargne}; });
+  }
+  /* Un cycle clôturé fige l'ouverture du suivant (soldes reportés) au moment de la
+     clôture. Si on saisit/édite/supprime ensuite une opération datée dans un mois déjà
+     clôturé (ex : dépense de juillet oubliée, ajoutée après avoir ouvert août), cette
+     ouverture figée devient périmée et les mois suivants n'en héritent plus. On
+     recalcule donc en cascade, à chaque sauvegarde, l'ouverture de tous les cycles
+     postérieurs à celui qui vient de changer. */
+  function resyncOpeningsFrom(cid){
+    const sorted=[...cycles.months].sort((a,b)=>(a.year*12+parseInt(a.mm,10))-(b.year*12+parseInt(b.mm,10)));
+    const idx=sorted.findIndex(m=>m.id===cid);
+    if(idx<0) return;
+    const activeId=M.id;
+    for(let i=idx; i<sorted.length-1; i++){
+      const cur=sorted[i], next=sorted[i+1];
+      setActive(cur.id);
+      const closingComptes=liveComptes().map(c=>({nom:c.nom, solde:Math.round(c.solde), type:c.type, note:c.note||''}));
+      const closingCoffres=liveCoffres().map(c=>({nom:c.nom, epargne:Math.round(c.epargne), objectif:c.objectif, bloque:c.bloque, note:''}));
+      next.opening = next.opening || {comptes:[], coffres:[]};
+      next.opening.comptes = closingComptes;
+      next.opening.coffres = closingCoffres;
+    }
+    setActive(activeId);
+    saveCycles();
   }
 
   /* ============================================================
@@ -1115,7 +1138,7 @@
       let moved=false;
       if(targetId!==M.id){ const k=newOps.indexOf(op); if(k>=0) newOps.splice(k,1); pushOpToMonth(targetId, op); moved=true; }
       if(d){ d.paid=true; d.repayDate=date; d.repayMonth=targetId; }
-      persist(); closeForm(); refreshAll(); switchTab('coffres');
+      persist(); if(moved) resyncOpeningsFrom(targetId); closeForm(); refreshAll(); switchTab('coffres');
       toast(moved ? 'Dette remboursée · revenu porté sur '+monthLabel(targetId) : 'Dette remboursée · revenu enregistré');
       return;
     }
@@ -1297,7 +1320,7 @@
       else { const tid=d.repayMonth||M.id;
         if(tid===M.id){ newOps=newOps.filter(o=>o._repay!==d.id); }
         else { removeOpFromMonth(tid, o=>o._repay===d.id); }
-        d.paid=false; delete d.repayDate; delete d.repayMonth; persist(); refreshAll(); toast('Remboursement annulé'); } });
+        d.paid=false; delete d.repayDate; delete d.repayMonth; persist(); if(tid!==M.id) resyncOpeningsFrom(tid); refreshAll(); toast('Remboursement annulé'); } });
     document.getElementById('detteNote').textContent = M.seed? S.dettesNote : '';
     document.getElementById('detteNote').style.display = M.seed? '' : 'none';
 
