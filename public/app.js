@@ -12,14 +12,14 @@
   /* ---------- storage helpers ---------- */
   function load(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
   function bucketKey(id){ return 'macaisse-m-'+id; }
-  function loadBucket(id){ return load(bucketKey(id), {newOps:[],dettePaid:{},ventilations:null,coffreOverrides:{},opOverrides:{},opDeletes:[]}); }
+  function loadBucket(id){ return load(bucketKey(id), {newOps:[],dettePaid:{},coffreOverrides:{},opOverrides:{},opDeletes:[]}); }
 
   /* ---------- cycles registry ---------- */
   function defaultCycles(){ return { activeId:'2026-06', months:[ {id:'2026-06',label:'Juin 2026',mm:'06',year:2026,monthName:'juin',seed:true} ] }; }
   function migrateJune(){
     if(localStorage.getItem('macaisse-m-2026-06')) return;
     const b={ newOps:load('macaisse-newops-v1',[]), dettePaid:load('macaisse-dettes-v1',{}),
-              ventilations:load('macaisse-ventilations-v2',null), coffreOverrides:load('macaisse-coffres-v1',{}) };
+              coffreOverrides:load('macaisse-coffres-v1',{}) };
     try{ localStorage.setItem('macaisse-m-2026-06', JSON.stringify(b)); }catch(e){}
   }
   let cycles = load('macaisse-cycles-v1', null);
@@ -54,13 +54,13 @@
   migratePlacements();
 
   /* ---------- active-month state ---------- */
-  let M, newOps, dettePaid, ventilations, coffreOverrides, userDettes, opOverrides, opDeletes;
-  let ventEditId=null, editingCoffre=null, editIdx=null, repayDetteId=null, ventPicking=null;
+  let M, newOps, dettePaid, coffreOverrides, userDettes, opOverrides, opDeletes;
+  let editingCoffre=null, editIdx=null, repayDetteId=null;
   let filterText='', filterCat='', filterType='all';
   let opPage=0, opPageSize=25, xMode='pay';
   let histView='jour';
   /* Chaque onglet a sa propre URL (voir rewrites next.config.mjs). */
-  const TAB_ROUTES={ dash:'/', pilot:'/suivi', ops:'/operations', coffres:'/coffres', vent:'/ventilation', bourse:'/bourse' };
+  const TAB_ROUTES={ dash:'/', pilot:'/suivi', ops:'/operations', coffres:'/coffres', vent:'/budget', bourse:'/bourse', pret:'/pret' };
   function tabFromPath(){ const p=(location.pathname||'/').replace(/\/+$/,'')||'/'; for(const t in TAB_ROUTES){ if(TAB_ROUTES[t]===p) return t; } return 'dash'; }
 
   function setActive(id){
@@ -69,14 +69,13 @@
     const b = loadBucket(M.id);
     newOps = b.newOps||[];
     dettePaid = b.dettePaid||{};
-    ventilations = (b.ventilations!=null) ? b.ventilations : (M.seed ? seedVentilations() : []);
     coffreOverrides = b.coffreOverrides||{};
     userDettes = b.userDettes||[];
     opOverrides = b.opOverrides||{};
     opDeletes = b.opDeletes||[];
   }
-  function saveBucket(){ try{ localStorage.setItem(bucketKey(M.id), JSON.stringify({newOps,dettePaid,ventilations,coffreOverrides,userDettes,opOverrides,opDeletes})); }catch(e){} resyncOpeningsFrom(M.id); }
-  const persist=saveBucket, persistV=saveBucket, persistCoffres=saveBucket;
+  function saveBucket(){ try{ localStorage.setItem(bucketKey(M.id), JSON.stringify({newOps,dettePaid,coffreOverrides,userDettes,opOverrides,opDeletes})); }catch(e){} resyncOpeningsFrom(M.id); }
+  const persist=saveBucket, persistCoffres=saveBucket;
   function coffreObjectif(c){ const o=coffreOverrides[c.nom]; return (o!=null&&o>0)?o:c.objectif; }
 
   /* ---------- base providers (seed vs derived) ---------- */
@@ -730,7 +729,7 @@
 
     const feed=document.getElementById('opFeed');
     const pager=document.getElementById('opPager');
-    if(!rows.length){ feed.innerHTML='<div class="vempty">Aucune opération'+(M.seed?' ne correspond à votre recherche.':' ce mois-ci. Ajoutez-en une, ou ventilez un revenu.')+'</div>'; if(pager) pager.innerHTML=''; return; }
+    if(!rows.length){ feed.innerHTML='<div class="vempty">Aucune opération'+(M.seed?' ne correspond à votre recherche.':' ce mois-ci. Ajoutez-en une.')+'</div>'; if(pager) pager.innerHTML=''; return; }
     const total=rows.length;
     const size = opPageSize===0? total : opPageSize;
     const pages = Math.max(1, Math.ceil(total/size));
@@ -1159,194 +1158,161 @@
     cl.querySelectorAll('[data-cfcancel]').forEach(b=>b.onclick=()=>{ editingCoffre=null; renderCoffres(); });
   }
 
-  /* ============================================================ VENTILATION */
-  function seedVentilations(){
-    const v=S.ventilation;
-    const lines=v.charges.map(c=>({poste:c.poste,type:'charge',montant:c.montant,fait:true,archived:true,note:c.note}));
-    lines.push({poste:'Coussin anti-agios (intouchable)',type:'coussin',montant:10000,fait:false,archived:true,note:'Éviter le découvert'});
-    lines.push({poste:'Coussin imprévus du mois',type:'coussin',montant:40000,fait:false,archived:true,note:'Petites dépenses'});
-    const used=lines.reduce((s,l)=>s+l.montant,0); const rest=Math.max(0,v.dispoAVentiler-used);
-    lines.push({poste:"Virement vers Fonds d'urgence (Djamo)",type:'coffre',montant:rest,fait:true,archived:true,note:"Le reste alimente l'épargne"});
-    return [{ id:'seed-juin', label:'Salaire — juin', date:'01/06', montant:v.dispoAVentiler, note:'Reste à couvrir hors salaire : Fibre 20 000 + Micro-ondes 22 500 (après le cours du 13/06).', lines }];
+  /* ============================================================ BUDGET
+     Un budget par catégorie de dépense, reconduit chaque mois (persisté
+     dans cycles.budgets — global, comme les réglages), comparé aux
+     dépenses réelles du mois actif (liveCategories()). */
+  const BUDGET_CATS=['Loyer','Factures','Transport','Nourriture','Provisions','Santé','Famille','Copine',"Départ sœurs",'Déco','Maison','Vêtements','Soins perso','Outils/Web','Frais','Prêt étudiant','Divers'];
+  /* Les dépenses de prêt étudiant ont été saisies sous plusieurs libellés au fil
+     du temps ("Prêt", "Prêt etudiant", "Prêt étudiant") — on les regroupe toutes
+     sous une seule catégorie budget pour ne pas fausser le suivi. */
+  function budgetCatKey(rawCat){
+    const norm=(rawCat||'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().toLowerCase();
+    if(/^pret\b/.test(norm)) return 'Prêt étudiant';
+    return rawCat;
   }
-  function typeLabel(t){ return t==='charge'?'Charge':t==='coffre'?'Coffre':'Coussin'; }
-  function mapChargeCat(poste){ const p=poste.toLowerCase();
-    if(/loyer/.test(p))return 'Loyer'; if(/transport|car\b|yango|taxi|abonnement car/.test(p))return 'Transport';
-    if(/eau|électr|elect|cie|sodeci|fibre|facture|poubelle|recharge/.test(p))return 'Factures';
-    if(/copine/.test(p))return 'Copine'; if(/maman|famille|aide|sœur|soeur|don/.test(p))return 'Aide famille';
-    if(/nourri|provision|march|course/.test(p))return 'Provisions'; if(/santé|sante|soin/.test(p))return 'Santé';
-    if(/outil|web|perplex|google/.test(p))return 'Outils/Web'; return poste; }
-  function matchCoffre(poste){ const p=poste.toLowerCase();
-    const comptes=baseComptes();
-    if(/scolar/.test(p))return comptes.find(c=>/scolar/i.test(c.nom))?.nom||'Coffre Scolarité (Djamo)';
-    if(/sgci|classique/.test(p))return comptes.find(c=>/sgci|classique/i.test(c.nom))?.nom||'Épargne classique SGCI';
-    if(/forcé|force|prêt|pret/.test(p))return comptes.find(c=>/forc/i.test(c.nom))?.nom||'Épargne forcée (prêt)';
-    return comptes.find(c=>/urgence/i.test(c.nom))?.nom||"Coffre Fonds d'urgence (Djamo)"; }
-  function bankAccount(){ const c=baseComptes().find(x=>/banque|sgbci/i.test(x.nom)); return c?c.nom:baseComptes()[0].nom; }
-  function vDate(v){ return v.date || ('01/'+M.mm); }
-  function makeLinkOp(v,line,linkId,compte){
-    const acc=compte||bankAccount();
-    if(line.type==='coussin') return null;
-    if(line.type==='charge') return { date:vDate(v), lib:line.poste, type:'dépense', compte:acc, cat:mapChargeCat(line.poste), montant:-Math.abs(line.montant), note:'Ventilation : '+v.label, _vlink:linkId, _ts:Date.now(), _t:hhmm() };
-    return { date:vDate(v), lib:line.poste, type:'virement', compte:acc, compteDest:matchCoffre(line.poste), cat:'', montant:Math.abs(line.montant), note:'Ventilation : '+v.label, _vlink:linkId, _ts:Date.now(), _t:hhmm() };
+  const BUDGET_CATICON={
+    'Loyer':'<path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path>',
+    'Transport':'<rect x="3" y="9" width="18" height="8" rx="2"></rect><circle cx="7.5" cy="18.5" r="1.5"></circle><circle cx="16.5" cy="18.5" r="1.5"></circle><path d="M5 9l1.5-4h11L19 9"></path>',
+    'Factures':'<path d="M4 3h16v18l-3-2-3 2-3-2-3 2-3-2-1 1z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
+    'Nourriture':'<path d="M6 2v7a3 3 0 0 0 3 3v10"></path><path d="M6 2v7"></path><path d="M9 2v7"></path><path d="M18 2c-2 1-3 3-3 6s1 3 3 3v11"></path>',
+    'Copine':'<path d="M12 21s-7-4.35-9.5-8.5C1 9 2.5 5 6.5 5c2 0 3.5 1.2 5.5 3.5C14 6.2 15.5 5 17.5 5c4 0 5.5 4 4 7.5C19 16.65 12 21 12 21z"></path>',
+    'Famille':'<circle cx="9" cy="7" r="3"></circle><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"></path><circle cx="18" cy="9" r="2.3"></circle><path d="M17 21v-.6a4 4 0 0 1 4-4h.2"></path>',
+    'Provisions':'<path d="M6 8h12l-1.2 12H7.2z"></path><path d="M9 8V6a3 3 0 0 1 6 0v2"></path>',
+    'Santé':'<path d="M12 21s-7-4.35-9.5-8.5C1 9 2.5 5 6.5 5c2 0 3.5 1.2 5.5 3.5C14 6.2 15.5 5 17.5 5c4 0 5.5 4 4 7.5C19 16.65 12 21 12 21z"></path><path d="M12 9v5M9.5 11.5h5"></path>',
+    'Outils/Web':'<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"></path>',
+    'Frais':'<circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5h.01M14.5 14.5h.01M15 9l-6 6"></path>',
+    'Prêt étudiant':'<rect x="2" y="7" width="20" height="13" rx="2"></rect><path d="M2 11h20"></path><path d="M6 15h4"></path>',
+    'Divers':'<circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle>'
+  };
+  const budgetIcon=cat=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${BUDGET_CATICON[cat]||BUDGET_CATICON['Divers']}</svg>`;
+  function getBudgets(){ return cycles.budgets||{}; }
+  function setBudget(cat, montant){
+    const b=Object.assign({}, getBudgets());
+    if(montant>0) b[cat]=Math.round(montant); else delete b[cat];
+    cycles.budgets=b; saveCycles();
   }
+  let budgetAdding=false, editingBudgetCat=null;
+  function renderBudget(){
+    const root=document.getElementById('budgetRoot'); if(!root) return;
+    const budgets=getBudgets();
+    const spent={};
+    liveCategories().forEach(c=>{ const k=budgetCatKey(c.label); spent[k]=(spent[k]||0)+c.value; });
+    const budgetedCats=Object.keys(budgets);
+    const totBudget=budgetedCats.reduce((s,c)=>s+budgets[c],0);
+    const totSpent=budgetedCats.reduce((s,c)=>s+(spent[c]||0),0);
+    const restant=totBudget-totSpent;
 
-  function renderVent(){
-    const host=document.getElementById('ventList'); const ov=document.getElementById('ventOverview');
-    if(!ventilations||!ventilations.length){
-      if(ov){ ov.style.display='none'; ov.innerHTML=''; }
-      host.innerHTML=`<div class="vempty">
-        <p>Aucune ventilation pour l'instant.</p>
-        <p class="vempty-sub">À chaque revenu, répartissez-le avant de dépenser : charges, coffres, coussins — le reste se calcule tout seul.</p>
-        <button class="btn btn-dark btn-sm" id="ventEmptyAddBtn">Créer ma première ventilation</button>
+    let html='';
+    if(budgetedCats.length){
+      html+=`<div class="kpis">
+        <div class="kpi dark"><div class="k">Budget total</div><div class="v num">${fmt(totBudget)}<span class="cur">FCFA</span></div><div class="d">${budgetedCats.length} catégorie${budgetedCats.length>1?'s':''} suivie${budgetedCats.length>1?'s':''}</div></div>
+        <div class="kpi"><div class="k">Dépensé ce mois-ci</div><div class="v num">${fmt(totSpent)}<span class="cur">F</span></div><div class="d">${cap(M.monthName)} ${M.year}</div></div>
+        <div class="kpi${restant<0?' accent':''}"><div class="k">${restant<0?'Dépassement':'Restant'}</div><div class="v num" style="color:${restant<0?'var(--red)':'var(--ink)'}">${fmt(Math.abs(restant))}<span class="cur">F</span></div></div>
       </div>`;
-      const eb=document.getElementById('ventEmptyAddBtn'); if(eb) eb.onclick=()=>openVentForm(null);
-      return;
     }
-    const totMontant=ventilations.reduce((s,v)=>s+v.montant,0);
-    const totReparti=ventilations.reduce((s,v)=>s+v.lines.reduce((a,l)=>a+l.montant,0),0);
-    const totFait=ventilations.reduce((s,v)=>s+v.lines.filter(l=>l.fait).reduce((a,l)=>a+l.montant,0),0);
-    if(ov){ ov.style.display=''; ov.innerHTML=`
-      <div class="cfo-item"><span class="cfo-k">Revenus ventilés</span><span class="cfo-v num">${fmt(totMontant)}<span class="cur">F</span></span></div>
-      <div class="cfo-item"><span class="cfo-k">Affecté</span><span class="cfo-v num">${fmt(totReparti)}<span class="cur">F</span></span></div>
-      <div class="cfo-item"><span class="cfo-k">Exécuté (au journal)</span><span class="cfo-v num" style="color:#7CD9AE">${fmt(totFait)}<span class="cur">F</span></span></div>`; }
-    const COL={charge:'var(--acier)',coffre:'var(--blue)',coussin:'var(--orange)'};
-    const TYPICON={charge:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
-      coffre:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M12 9v0"></path></svg>',
-      coussin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2L12 16.4 5.7 21l2.3-7.2-6-4.6h7.6z"></path></svg>'};
-    const CATICON={
-      'Loyer':'<path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path>',
-      'Transport':'<rect x="3" y="9" width="18" height="8" rx="2"></rect><circle cx="7.5" cy="18.5" r="1.5"></circle><circle cx="16.5" cy="18.5" r="1.5"></circle><path d="M5 9l1.5-4h11L19 9"></path>',
-      'Factures':'<path d="M4 3h16v18l-3-2-3 2-3-2-3 2-3-2-1 1z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
-      'Copine':'<path d="M12 21s-7-4.35-9.5-8.5C1 9 2.5 5 6.5 5c2 0 3.5 1.2 5.5 3.5C14 6.2 15.5 5 17.5 5c4 0 5.5 4 4 7.5C19 16.65 12 21 12 21z"></path>',
-      'Aide famille':'<circle cx="9" cy="7" r="3"></circle><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"></path><circle cx="18" cy="9" r="2.3"></circle><path d="M17 21v-.6a4 4 0 0 1 4-4h.2"></path>',
-      'Provisions':'<path d="M6 8h12l-1.2 12H7.2z"></path><path d="M9 8V6a3 3 0 0 1 6 0v2"></path>',
-      'Santé':'<path d="M12 21s-7-4.35-9.5-8.5C1 9 2.5 5 6.5 5c2 0 3.5 1.2 5.5 3.5C14 6.2 15.5 5 17.5 5c4 0 5.5 4 4 7.5C19 16.65 12 21 12 21z"></path><path d="M12 9v5M9.5 11.5h5"></path>',
-      'Outils/Web':'<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"></path>',
-      'Frais':'<circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5h.01M14.5 14.5h.01M15 9l-6 6"></path>',
-      'Divers':'<circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle>'
-    };
-    const catIcon=cat=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${CATICON[cat]||CATICON['Divers']}</svg>`;
-    const spentByCat=liveCategories().reduce((m,c)=>{ m[c.label]=c.value; return m; },{});
-    const budgetByCat={};
-    ventilations.forEach(v=>v.lines.forEach(l=>{ if(l.type==='charge'){ const c=mapChargeCat(l.poste); budgetByCat[c]=(budgetByCat[c]||0)+l.montant; } }));
-    host.innerHTML=ventilations.map(v=>{
-      const reparti=v.lines.reduce((s,l)=>s+l.montant,0); const restant=v.montant-reparti;
-      const fait=v.lines.filter(l=>l.fait).reduce((s,l)=>s+l.montant,0);
-      const pctRep=v.montant?Math.min(100,reparti/v.montant*100):0;
-      const ringCol=restant<0?'var(--red)':restant===0?'var(--green)':'var(--orange)';
-      const tsum=t=>v.lines.filter(l=>l.type===t).reduce((s,l)=>s+l.montant,0);
-      const segData=[['charge','Charges'],['coffre','Coffres'],['coussin','Coussins']].map(([t,lbl])=>({t,lbl,sum:tsum(t)}));
-      const segs=segData.map(d=>{ const w=v.montant?Math.min(100,d.sum/v.montant*100):0; return w>0?`<div class="seg-${d.t}" style="width:${w.toFixed(2)}%"></div>`:''; }).join('');
-      const legend=segData.filter(d=>d.sum>0).map(d=>`<div class="alloc-leg"><span class="dot" style="background:${COL[d.t]}"></span>${d.lbl} <b class="num">${fmt(d.sum)} F</b><span class="lp">${(d.sum/(v.montant||1)*100).toFixed(0)}%</span></div>`).join('');
-      const restCls=restant>0?'left':restant<0?'over':'ok';
-      const restTxt=restant>0?`Restant à affecter : ${fmt(restant)} F`:restant<0?`Dépassement : ${fmt(-restant)} F`:'Entièrement réparti';
-      const lines=v.lines.map((l,i)=>{
-        const isCharge=l.type==='charge';
-        const cat=isCharge?mapChargeCat(l.poste):null;
-        const spent=isCharge?(spentByCat[cat]||0):0;
-        const budget=isCharge?(budgetByCat[cat]||0):0;
-        const pctB=isCharge&&budget?Math.min(999,spent/budget*100):0;
-        let budgetStatus='', budgetCls='';
-        if(isCharge){
-          if(spent===0){ budgetStatus='Pas encore dépensé'; budgetCls='none'; }
-          else if(spent<budget*0.9){ budgetStatus='En cours'; budgetCls='ok'; }
-          else if(spent<=budget){ budgetStatus='Atteint'; budgetCls='at'; }
-          else { budgetStatus='Dépassé de '+fmt(spent-budget)+' F'; budgetCls='over'; }
-        }
-        const icon = isCharge ? catIcon(cat) : TYPICON[l.type];
-        const vkey=v.id+'|'+i;
-        const needsCompte=!l.archived&&(l.type==='charge'||l.type==='coffre');
-        const picking=needsCompte&&!l.fait&&ventPicking===vkey;
-        const statCell = l.fait
-          ? `<button class="vstatbtn fait" data-vfait="${vkey}">✓ Fait</button>`
-          : picking
-            ? `<div class="vstatbtn vfait-picker">
-                <select data-vfaitcompte="${vkey}">${baseComptes().map(c=>`<option ${c.nom===bankAccount()?'selected':''}>${c.nom}</option>`).join('')}</select>
-                <button class="iconbtn" data-vfaitok="${vkey}" title="Valider">OK</button>
-                <button class="iconbtn" data-vfaitcancel="${vkey}" title="Annuler">✕</button>
-              </div>`
-            : `<button class="vstatbtn" data-vfait="${vkey}">Prévu</button>`;
-        return `<div class="vline"><span class="vl-ic ${l.type}">${icon}</span>
-          <div class="vl-main"><div class="vlp">${l.poste}${isCharge?`<span class="vl-cat">${cat}</span>`:''}</div>${l.note?`<div class="vln">${l.note}</div>`:''}${l.archived?'<div class="vln">déjà au journal ('+M.monthName+')</div>':(l.linkId?'<div class="vln" style="color:var(--green)">✓ inscrit au journal</div>':'')}
-            ${isCharge?`<div class="vl-budget"><div class="vlb-track"><div class="vlb-fill ${budgetCls}" style="width:${Math.min(100,pctB).toFixed(1)}%"></div></div><span class="vlb-txt ${budgetCls}">${fmt(spent)} F dépensé / ${fmt(budget)} F alloué (catégorie) · ${budgetStatus}</span></div>`:''}
-            ${picking?`<div class="vln" style="color:var(--orange)">Choisissez le compte sur lequel ça a été fait</div>`:''}
-          </div>
-          <span class="vtype ${l.type}">${typeLabel(l.type)}</span><div class="vlm num">${fmt(l.montant)} F</div>
-          ${statCell}
-          <button class="iconbtn" data-vdel="${v.id}|${i}">Suppr.</button></div>`;
-      }).join('');
-      const allFait=v.lines.length>0&&v.lines.every(l=>l.fait);
-      return `<div class="vcard" style="border-top-color:${ringCol}">
-        <div class="vc-head"><div class="vc-id"><div class="vc-label">${v.label}${allFait?'<span class="vc-done-badge">✓ Exécutée</span>':''}</div><div class="vc-date">${v.date||''}</div></div>
-          <div class="vc-money"><div class="vm num">${fmt(v.montant)} F</div><div class="vmk">à ventiler</div></div>
-          <div class="vc-acts"><button class="iconbtn" data-vedit="${v.id}">Modif.</button><button class="iconbtn" data-vdelcard="${v.id}">Suppr.</button></div></div>
-        <div class="vc-top">
-          <div class="vc-ring" style="background:conic-gradient(${ringCol} ${pctRep.toFixed(1)}%, #E7E3DA ${pctRep.toFixed(1)}% 100%)"><div class="vrc"><b class="num">${pctRep.toFixed(0)}%</b><span>réparti</span></div></div>
-          <div class="vc-breakdown">
-            <div class="alloc-bar">${segs||'<div style="width:100%"></div>'}</div>
-            <div class="alloc-legend">${legend||'<span class="lp" style="font-family:var(--mono);font-size:11px;color:var(--muted)">Aucune affectation — ajoutez une ligne ci-dessous</span>'}</div>
-            <div class="vc-status"><span>Réparti <b class="num">${fmt(reparti)} F</b> / ${fmt(v.montant)} F</span><span class="${restCls}">${restTxt}</span></div>
-          </div></div>
-        <div class="vlines">${lines}
-          <div class="vline-add">
-            <label><span class="lab">Poste à affecter</span><input type="text" data-vaddposte="${v.id}" placeholder="Ex. Loyer, Coffre urgence, Coussin…"></label>
-            <label><span class="lab">Type</span><select data-vaddtype="${v.id}"><option value="charge">Charge</option><option value="coffre">Coffre</option><option value="coussin">Coussin</option></select></label>
-            <label><span class="lab">Montant (F)</span><input type="number" data-vaddmontant="${v.id}" min="0" step="1" placeholder="0"></label>
-            <button class="btn btn-ghost btn-sm" data-vadd="${v.id}">+ Affecter</button></div></div>
-        ${v.note?`<div class="vnote-line">${v.note}</div>`:''}
-        <div class="vcard-foot"><span>Déjà effectué : <b class="num">${fmt(fait)} F</b></span><span>Reste prévu (non exécuté) : <b class="num">${fmt(reparti-fait)} F</b></span></div>
-      </div>`;
-    }).join('');
 
-    host.querySelectorAll('[data-vfait]').forEach(b=>b.onclick=()=>{
-      const[id,i]=b.dataset.vfait.split('|'); const v=ventilations.find(x=>x.id===id); const line=v.lines[+i];
-      if(line.archived){ line.fait=!line.fait; persistV(); renderVent(); return; }
-      if(!line.fait){
-        if(line.type==='coussin'){ line.fait=true; toast('Coussin gardé liquide sur la banque'); persistV(); refreshAll(); renderVent(); return; }
-        ventPicking=id+'|'+i; renderVent(); return;
-      }
-      line.fait=false; if(line.linkId){ newOps=newOps.filter(o=>o._vlink!==line.linkId); line.linkId=null; persist(); toast('Annulé — opération retirée du journal'); }
-      persistV(); refreshAll(); renderVent();
+    html+=`<div class="optools">
+      <button class="btn btn-dark" id="budgetAddBtn">+ Nouveau budget <span class="b"></span></button>
+      <span class="sub" style="font-size:12px;color:var(--muted)">Un montant par catégorie, reconduit chaque mois</span>
+    </div>`;
+
+    if(budgetAdding){
+      const availCats=BUDGET_CATS.filter(c=>!budgets[c]);
+      html+=`<div class="fform open" id="budgetAddForm">
+        <div class="grid">
+          <label class="wide"><span class="lab">Catégorie</span>
+            <select id="budgetNewCat">${availCats.map(c=>`<option value="${c}">${c}</option>`).join('')}<option value="__custom__">+ Autre catégorie (préciser)…</option></select>
+            <input type="text" id="budgetNewCatCustom" placeholder="Nom de la catégorie" style="margin-top:8px;display:none">
+          </label>
+          <label><span class="lab">Budget mensuel (F)</span><input type="number" id="budgetNewMontant" min="0" step="500" placeholder="0"></label>
+        </div>
+        <div class="actions">
+          <button class="btn btn-dark btn-sm" id="budgetAddSave">Ajouter</button>
+          <button class="btn btn-ghost btn-sm" id="budgetAddCancel">Annuler</button>
+        </div>
+      </div>`;
+    }
+
+    if(!budgetedCats.length && !budgetAdding){
+      html+=`<div class="vempty">
+        <p>Aucun budget défini pour l'instant.</p>
+        <p>Fixez un montant mensuel sur une catégorie (ex. Nourriture, Transport…) pour voir en un coup d'œil où vous en êtes.</p>
+      </div>`;
+    } else if(budgetedCats.length){
+      html+=`<div class="card"><div class="ct">Budget par catégorie</div>`;
+      html+=budgetedCats.map(cat=>{
+        const bud=budgets[cat]; const sp=spent[cat]||0;
+        const pctB=bud? Math.min(100,sp/bud*100) : 0;
+        const cls = sp>bud ? 'over' : sp>=bud*0.9 ? 'at' : 'ok';
+        const tagTxt = cls==='over'?' · dépassé':cls==='at'?' · bientôt atteint':'';
+        const editing=editingBudgetCat===cat;
+        return `<div class="budget-row">
+          <span class="budget-cat-ic">${budgetIcon(cat)}</span>
+          <div class="budget-row-main">
+            <div class="budget-row-top"><span class="budget-row-name">${cat}</span><span class="budget-row-amt ${cls}"><b class="num">${fmt(sp)}</b> / ${fmt(bud)} F${tagTxt}</span></div>
+            <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pctB.toFixed(1)}%"></div></div>
+          </div>
+          <div class="budget-row-acts">
+            <button class="iconbtn" data-budgetedit="${cat}">Modif.</button>
+            <button class="iconbtn" data-budgetdel="${cat}">Suppr.</button>
+          </div>
+          ${editing?`<div class="cf-edit"><label><span class="lab">Nouveau budget (F)</span><input type="number" min="0" step="500" id="budgetEditInput" value="${bud}"></label><button class="btn btn-dark btn-sm" data-budgetsave="${cat}">OK</button><button class="btn btn-ghost btn-sm" data-budgetcancel="1">Annuler</button></div>`:''}
+        </div>`;
+      }).join('');
+      html+=`</div>`;
+    }
+
+    const unbudgetedSpent=Object.keys(spent).filter(c=>!budgets[c] && spent[c]>0).sort((a,b)=>spent[b]-spent[a]);
+    if(unbudgetedSpent.length){
+      html+=`<div class="card">
+        <div class="ct">Dépenses sans budget ce mois-ci</div>
+        ${unbudgetedSpent.map(c=>`
+          <div class="budget-row">
+            <span class="budget-cat-ic">${budgetIcon(c)}</span>
+            <div class="budget-row-main"><span class="budget-row-name">${c}</span></div>
+            <div class="budget-row-acts"><b class="num" style="margin-right:6px">${fmt(spent[c])} F</b><button class="iconbtn" data-budgetquick="${c}">Définir un budget</button></div>
+          </div>`).join('')}
+      </div>`;
+    }
+
+    root.innerHTML=html;
+
+    const addBtn=document.getElementById('budgetAddBtn');
+    if(addBtn) addBtn.onclick=()=>{ budgetAdding=true; renderBudget(); };
+    const addCancel=document.getElementById('budgetAddCancel');
+    if(addCancel) addCancel.onclick=()=>{ budgetAdding=false; renderBudget(); };
+    const newCatSel=document.getElementById('budgetNewCat');
+    if(newCatSel) newCatSel.onchange=()=>{ document.getElementById('budgetNewCatCustom').style.display=newCatSel.value==='__custom__'?'':'none'; };
+    const addSave=document.getElementById('budgetAddSave');
+    if(addSave) addSave.onclick=()=>{
+      const sel=document.getElementById('budgetNewCat');
+      const cat=sel.value==='__custom__'? document.getElementById('budgetNewCatCustom').value.trim() : sel.value;
+      const montant=parseFloat(document.getElementById('budgetNewMontant').value);
+      if(!cat){ toast('Choisissez une catégorie'); return; }
+      if(!montant||montant<=0){ toast('Indiquez un montant'); return; }
+      setBudget(cat, montant); budgetAdding=false; renderBudget(); toast('Budget ajouté · '+cat);
+    };
+    root.querySelectorAll('[data-budgetedit]').forEach(b=>b.onclick=()=>{ editingBudgetCat=b.dataset.budgetedit; renderBudget();
+      const inp=document.getElementById('budgetEditInput'); if(inp){ inp.focus(); inp.select(); } });
+    root.querySelectorAll('[data-budgetcancel]').forEach(b=>b.onclick=()=>{ editingBudgetCat=null; renderBudget(); });
+    root.querySelectorAll('[data-budgetsave]').forEach(b=>b.onclick=()=>{
+      const cat=b.dataset.budgetsave; const val=parseFloat(document.getElementById('budgetEditInput').value);
+      if(!val||val<=0){ toast('Montant invalide'); return; }
+      setBudget(cat, val); editingBudgetCat=null; renderBudget(); toast('Budget mis à jour');
     });
-    host.querySelectorAll('[data-vfaitcancel]').forEach(b=>b.onclick=()=>{ ventPicking=null; renderVent(); });
-    host.querySelectorAll('[data-vfaitok]').forEach(b=>b.onclick=()=>{
-      const[id,i]=b.dataset.vfaitok.split('|'); const v=ventilations.find(x=>x.id===id); const line=v.lines[+i];
-      const compte=host.querySelector(`[data-vfaitcompte="${id}|${i}"]`).value;
-      line.fait=true; const op=makeLinkOp(v,line,'vl'+Date.now(),compte); line.linkId=op._vlink; newOps.push(op); persist();
-      toast(op.type==='dépense'?'Fait — dépense ajoutée au journal':'Fait — virement ajouté au journal');
-      ventPicking=null; persistV(); refreshAll(); renderVent();
+    root.querySelectorAll('[data-budgetdel]').forEach(b=>b.onclick=()=>{
+      const cat=b.dataset.budgetdel;
+      if(!confirm('Supprimer le budget « '+cat+' » ?')) return;
+      setBudget(cat, 0); renderBudget(); toast('Budget supprimé');
     });
-    host.querySelectorAll('[data-vdel]').forEach(b=>b.onclick=()=>{ const[id,i]=b.dataset.vdel.split('|'); const v=ventilations.find(x=>x.id===id); const line=v.lines[+i]; if(line&&line.linkId){ newOps=newOps.filter(o=>o._vlink!==line.linkId); persist(); } v.lines.splice(+i,1); persistV(); refreshAll(); renderVent(); toast('Ligne retirée'); });
-    host.querySelectorAll('[data-vadd]').forEach(b=>b.onclick=()=>{ const id=b.dataset.vadd; const v=ventilations.find(x=>x.id===id); const poste=host.querySelector(`[data-vaddposte="${id}"]`).value.trim(); const type=host.querySelector(`[data-vaddtype="${id}"]`).value; const m=parseFloat(host.querySelector(`[data-vaddmontant="${id}"]`).value); if(!poste||!m){ toast('Poste et montant requis'); return; } v.lines.push({poste,type,montant:Math.abs(m),fait:false}); persistV(); renderVent(); toast('Affectation ajoutée'); });
-    host.querySelectorAll('[data-vedit]').forEach(b=>b.onclick=()=>openVentForm(b.dataset.vedit));
-    host.querySelectorAll('[data-vdelcard]').forEach(b=>b.onclick=()=>{ if(!confirm('Supprimer cette ventilation ? Les opérations qu’elle a créées dans le journal seront aussi retirées.')) return; const v=ventilations.find(x=>x.id===b.dataset.vdelcard); const ids=(v?v.lines:[]).map(l=>l.linkId).filter(Boolean); if(ids.length){ newOps=newOps.filter(o=>!ids.includes(o._vlink)); persist(); } ventilations=ventilations.filter(x=>x.id!==b.dataset.vdelcard); persistV(); refreshAll(); renderVent(); toast('Ventilation supprimée'); });
-  }
-  function fillRevSelect(){
-    const sel=document.getElementById('vfFromRev');
-    const revs=allOps().filter(o=>o.type==='revenu').sort((a,b)=>parseDate(b.date)-parseDate(a.date));
-    sel.innerHTML='<option value="">— Saisie manuelle —</option>'+revs.map((o,i)=>`<option value="${i}">${o.date} · ${o.lib} · ${fmt(Math.abs(o.montant))} F</option>`).join('');
-    sel._revs=revs;
-  }
-  function openVentForm(id){
-    document.getElementById('ventForm').classList.add('open'); ventEditId=id||null;
-    const v=id?ventilations.find(x=>x.id===id):null;
-    document.getElementById('vfLabel').value=v?v.label:'';
-    document.getElementById('vfDate').value=v?v.date:defaultOpDate();
-    document.getElementById('vfMontant').value=v?v.montant:'';
-    document.getElementById('vfFromRev').value='';
-    document.getElementById('ventFormTitle').textContent=id?'Modifier la ventilation':'Nouvelle ventilation';
-    document.getElementById('vfLabel').focus();
-  }
-  function closeVentForm(){ document.getElementById('ventForm').classList.remove('open'); ventEditId=null; }
-  function saveVentForm(){
-    const label=document.getElementById('vfLabel').value.trim();
-    const date=document.getElementById('vfDate').value.trim();
-    const montant=parseFloat(document.getElementById('vfMontant').value);
-    if(!label||!montant){ toast('Libellé et montant requis'); return; }
-    if(ventEditId){ const v=ventilations.find(x=>x.id===ventEditId); v.label=label; v.date=date; v.montant=Math.abs(montant); }
-    else ventilations.unshift({ id:'v'+Date.now(), label, date, montant:Math.abs(montant), note:'', lines:[] });
-    persistV(); closeVentForm(); renderVent(); toast(ventEditId?'Ventilation modifiée':'Ventilation créée');
+    root.querySelectorAll('[data-budgetquick]').forEach(b=>b.onclick=()=>{
+      budgetAdding=true; renderBudget();
+      const sel=document.getElementById('budgetNewCat'); const cat=b.dataset.budgetquick;
+      if(sel){ if([...sel.options].some(o=>o.value===cat)) sel.value=cat;
+        else { sel.value='__custom__'; document.getElementById('budgetNewCatCustom').style.display=''; document.getElementById('budgetNewCatCustom').value=cat; } }
+      const mi=document.getElementById('budgetNewMontant'); if(mi) mi.focus();
+    });
   }
 
   /* ============================================================ HISTORIQUE */
@@ -1563,7 +1529,7 @@
     setActive(id); editingCoffre=null; filterText=''; filterCat=''; filterType='all'; opPage=0;
     const sb=document.getElementById('opSearch'); if(sb) sb.value='';
     document.querySelectorAll('#typeChips .typechip').forEach(x=>x.classList.toggle('active',x.dataset.type==='all'));
-    fillCompteSelects(); refreshAll(); renderVent(); renderHist(); buildMonthSelect();
+    fillCompteSelects(); refreshAll(); renderBudget(); renderHist(); buildMonthSelect();
     document.querySelector('[data-tab=dash]')?.click();
     toast('Cycle : '+M.label);
   }
@@ -1579,7 +1545,7 @@
     const meta={ id, label:cap(MONTHS[mi-1])+' '+y, mm, year:y, monthName:MONTHS[mi-1], seed:false,
       opening:{ comptes: closing.filter(c=>c.type!=='placement').map(c=>({nom:c.nom,solde:Math.round(c.solde),type:c.type,note:c.note||''})), coffres: coffresClose } };
     cycles.months.push(meta); saveCycles();
-    try{ localStorage.setItem(bucketKey(id), JSON.stringify({newOps:[],dettePaid:{},ventilations:[],coffreOverrides:{...coffreOverrides}})); }catch(e){}
+    try{ localStorage.setItem(bucketKey(id), JSON.stringify({newOps:[],dettePaid:{},coffreOverrides:{...coffreOverrides}})); }catch(e){}
     switchMonth(id); toast('Nouveau cycle : '+meta.label);
   }
   function deleteCurrentCycle(){
@@ -1599,7 +1565,8 @@
   const BN_MORE=[
     {tab:'ops',   label:'Opérations', icon:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.3"/><circle cx="3.5" cy="12" r="1.3"/><circle cx="3.5" cy="18" r="1.3"/>'},
     {tab:'vent',  label:'Budget',     icon:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/>'},
-    {tab:'bourse',label:'Bourse',     icon:'<path d="M4 20V4M4 20h16"/><path d="M8 16l3.5-4 3 3L20 8"/>'}
+    {tab:'bourse',label:'Bourse',     icon:'<path d="M4 20V4M4 20h16"/><path d="M8 16l3.5-4 3 3L20 8"/>'},
+    {tab:'pret',  label:'Prêt',       icon:'<rect x="2" y="7" width="20" height="13" rx="2"/><path d="M2 11h20"/><path d="M6 15h4"/>'}
   ];
   const BN_ICONS={
     dash:'<path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/>',
@@ -1642,10 +1609,195 @@
   function closeMoreSheet(){ const s=document.getElementById('moreSheet'), b=document.getElementById('moreBackdrop');
     if(b) b.classList.remove('show'); if(s) s.classList.remove('open'); document.body.classList.remove('more-open'); }
 
+  /* ============================================================
+     Onglet PRÊT (prêt étudiant SGBCI n°101848 — remboursement
+     automatique mensuel). Tableau d'amortissement officiel de la
+     banque (relevé du 13/02/2026), saisi une fois pour toutes.
+     Indépendant des cycles mensuels de Cauris (comme Bourse) : le
+     statut de chaque échéance se déduit simplement de la date du jour.
+     ============================================================ */
+  const PRET_INFO={
+    numero:'101848', banque:'Société Générale Côte d’Ivoire · agence Riviera Palmeraie',
+    montant:4500000, tauxInterets:7.5, tauxAssurance:1.1,
+    fraisDossier:99000, tauxFraisDossier:10,
+    dateMiseEnPlace:'27/01/2025', premiereEcheance:'25/02/2025', derniereEcheance:'25/01/2030',
+    nbEcheances:60
+  };
+  // [no, date, capital, intérêts (charges + taxe 10%), assurance (Stamvie Allianz/Colina), montant échéance, capital restant dû]
+  const PRET_ECHEANCES=[
+    [2,'25/02/2025',59116,29906,3987,93009,4440884],
+    [3,'25/03/2025',59576,30532,4071,94179,4381308],
+    [4,'25/04/2025',60042,30121,4016,94179,4321266],
+    [5,'25/05/2025',60509,29709,3961,94179,4260757],
+    [6,'25/06/2025',60980,29293,3906,94179,4199777],
+    [7,'25/07/2025',61455,28874,3850,94179,4138322],
+    [8,'25/08/2025',61934,28452,3793,94179,4076388],
+    [9,'25/09/2025',62417,28025,3737,94179,4013971],
+    [10,'25/10/2025',62904,27596,3679,94179,3951067],
+    [11,'25/11/2025',63394,27163,3622,94179,3887673],
+    [12,'25/12/2025',63887,26728,3564,94179,3823786],
+    [13,'25/01/2026',64385,26289,3505,94179,3759401],
+    [14,'25/02/2026',64887,25846,3446,94179,3694514],
+    [15,'25/03/2026',65392,25400,3387,94179,3629122],
+    [16,'25/04/2026',65902,24950,3327,94179,3563220],
+    [17,'25/05/2026',66416,24497,3266,94179,3496804],
+    [18,'25/06/2026',66933,24041,3205,94179,3429871],
+    [19,'25/07/2026',67454,23581,3144,94179,3362417],
+    [20,'25/08/2026',67980,23117,3082,94179,3294437],
+    [21,'25/09/2026',68510,22649,3020,94179,3225927],
+    [22,'25/10/2026',69044,22178,2957,94179,3156883],
+    [23,'25/11/2026',69581,21704,2894,94179,3087302],
+    [24,'25/12/2026',70123,21226,2830,94179,3017179],
+    [25,'25/01/2027',70670,20743,2766,94179,2946509],
+    [26,'25/02/2027',71220,20258,2701,94179,2875289],
+    [27,'25/03/2027',71775,19768,2636,94179,2803514],
+    [28,'25/04/2027',72335,19274,2570,94179,2731179],
+    [29,'25/05/2027',72898,18777,2504,94179,2658281],
+    [30,'25/06/2027',73467,18275,2437,94179,2584814],
+    [31,'25/07/2027',74039,17771,2369,94179,2510775],
+    [32,'25/08/2027',74616,17261,2302,94179,2436159],
+    [33,'25/09/2027',75197,16749,2233,94179,2360962],
+    [34,'25/10/2027',75783,16232,2164,94179,2285179],
+    [35,'25/11/2027',76374,15710,2095,94179,2208805],
+    [36,'25/12/2027',76968,15186,2025,94179,2131837],
+    [37,'25/01/2028',77569,14656,1954,94179,2054268],
+    [38,'25/02/2028',78173,14123,1883,94179,1976095],
+    [39,'25/03/2028',78782,13586,1811,94179,1897313],
+    [40,'25/04/2028',79396,13044,1739,94179,1817917],
+    [41,'25/05/2028',80015,12498,1666,94179,1737902],
+    [42,'25/06/2028',80638,11948,1593,94179,1657264],
+    [43,'25/07/2028',81266,11394,1519,94179,1575998],
+    [44,'25/08/2028',81899,10835,1445,94179,1494099],
+    [45,'25/09/2028',82537,10272,1370,94179,1411562],
+    [46,'25/10/2028',83181,9704,1294,94179,1328381],
+    [47,'25/11/2028',83829,9132,1218,94179,1244552],
+    [48,'25/12/2028',84482,8556,1141,94179,1160070],
+    [49,'25/01/2029',85141,7975,1063,94179,1074929],
+    [50,'25/02/2029',85804,7390,985,94179,989125],
+    [51,'25/03/2029',86472,6800,907,94179,902653],
+    [52,'25/04/2029',87146,6206,827,94179,815507],
+    [53,'25/05/2029',87824,5607,748,94179,727683],
+    [54,'25/06/2029',88509,5003,667,94179,639174],
+    [55,'25/07/2029',89198,4395,586,94179,549976],
+    [56,'25/08/2029',89894,3781,504,94179,460082],
+    [57,'25/09/2029',90593,3164,422,94179,369489],
+    [58,'25/10/2029',91300,2540,339,94179,278189],
+    [59,'25/11/2029',92011,1913,255,94179,186178],
+    [60,'25/12/2029',92728,1280,171,94179,93450],
+    [61,'25/01/2030',93450,643,86,94179,0]
+  ].map(r=>({no:r[0],date:r[1],capital:r[2],interets:r[3],assurance:r[4],montant:r[5],reste:r[6]}));
+
+  function pretParseDate(d){ const m=(d||'').match(/(\d+)\/(\d+)\/(\d+)/); return m? new Date(+m[3], +m[2]-1, +m[1]) : null; }
+  function pretIsPaid(e){ const dt=pretParseDate(e.date); return dt? dt<=new Date() : false; }
+  /* Une échéance « enregistrée » a une vraie opération liée (op._pretNo) dans le
+     journal — indépendant du statut Payée/À venir, qui reste une prévision basée
+     sur la date. Scan de tous les cycles (comme classifyAllCycles en son temps). */
+  function pretAllLinks(){
+    const map={};
+    cycles.months.forEach(cyc=>{
+      const ops = cyc.id===M.id ? newOps : (loadBucket(cyc.id).newOps||[]);
+      ops.forEach(o=>{ if(o._pretNo!=null) map[o._pretNo]={cycleId:cyc.id, op:o}; });
+    });
+    return map;
+  }
+  function pretMarkPaid(e){
+    if(pretAllLinks()[e.no]) return;
+    const day=(e.date.split('/')[0]||'').padStart(2,'0');
+    const op={ date:day+'/'+M.mm, lib:'Prêt SGBCI — échéance n°'+e.no, type:'dépense',
+      compte:'Banque (SGBCI)', cat:'Prêt étudiant', montant:-e.montant,
+      note:'Capital '+fmt(e.capital)+' F · intérêts '+fmt(e.interets)+' F · assurance '+fmt(e.assurance)+' F · capital restant dû '+fmt(e.reste)+' F',
+      _pretNo:e.no, _ts:Date.now(), _t:hhmm() };
+    newOps.push(op);
+    persist(); renderPret();
+    toast('Échéance n°'+e.no+' marquée payée · opération créée sur '+M.monthName);
+  }
+  function pretUnmark(e){
+    const link=pretAllLinks()[e.no]; if(!link) return;
+    if(!confirm('Retirer l’opération créée pour l’échéance n°'+e.no+' ?')) return;
+    if(link.cycleId===M.id){ const i=newOps.indexOf(link.op); if(i>=0) newOps.splice(i,1); persist(); }
+    else { removeOpFromMonth(link.cycleId, o=>o._pretNo===e.no); }
+    renderPret();
+    toast('Opération retirée');
+  }
+  function pretSummary(){
+    const payees=PRET_ECHEANCES.filter(pretIsPaid);
+    const last=payees[payees.length-1]||null;
+    const next=PRET_ECHEANCES.find(e=>!pretIsPaid(e))||null;
+    const resteDu=last?last.reste:PRET_INFO.montant;
+    const rembourse=PRET_INFO.montant-resteDu;
+    const pct=PRET_INFO.montant>0? rembourse/PRET_INFO.montant*100 : 0;
+    return { last, next, resteDu, rembourse, pct, payees:payees.length, restantes:PRET_ECHEANCES.length-payees.length };
+  }
+  function injectPretTab(){
+    const tabs=document.querySelector('.topbar .tabs');
+    if(tabs && !tabs.querySelector('[data-tab="pret"]')){
+      const btn=document.createElement('button');
+      btn.className='tab'; btn.dataset.tab='pret'; btn.textContent='Prêt';
+      const bourse=tabs.querySelector('[data-tab="bourse"]');
+      if(bourse) bourse.insertAdjacentElement('afterend', btn); else tabs.appendChild(btn);
+      btn.onclick=()=>switchTab('pret');
+    }
+    if(!document.getElementById('panel-pret')){
+      const main=document.querySelector('main.wrap');
+      const sec=document.createElement('section');
+      sec.className='panel'; sec.id='panel-pret'; sec.setAttribute('data-screen-label','Prêt');
+      sec.innerHTML=
+        '<div class="sec-title"><span class="n">▸</span><h2>Prêt étudiant</h2>'+
+        `<span class="sub">${PRET_INFO.banque} · Prêt n°${PRET_INFO.numero} · remboursement automatique mensuel</span></div>`+
+        '<div id="pretRoot"></div>';
+      if(main) main.appendChild(sec);
+    }
+  }
+  function renderPret(){
+    const root=document.getElementById('pretRoot'); if(!root) return;
+    const s=pretSummary();
+    const finPct=Math.max(0,Math.min(100,s.pct));
+    let html='';
+    html+=`<div class="kpis">
+      <div class="kpi dark"><div class="k">Capital restant dû</div><div class="v num">${fmt(s.resteDu)}<span class="cur">FCFA</span></div><div class="d">Sur ${fmt(PRET_INFO.montant)} F empruntés</div></div>
+      <div class="kpi"><div class="k">Capital remboursé</div><div class="v num">${s.pct.toFixed(1)}<span class="cur">%</span></div><div class="d">${fmt(s.rembourse)} F remboursés</div></div>
+      <div class="kpi${s.next?'':' accent'}"><div class="k">${s.next?'Prochaine échéance':'Prêt soldé'}</div><div class="v num">${s.next?fmt(s.next.montant):'—'}<span class="cur">${s.next?'F':''}</span></div><div class="d">${s.next?('Le '+s.next.date):('Depuis le '+PRET_INFO.derniereEcheance)}</div></div>
+      <div class="kpi"><div class="k">Échéances restantes</div><div class="v num">${s.restantes}<span class="cur">/ ${PRET_INFO.nbEcheances}</span></div><div class="d">Fin de prêt le ${PRET_INFO.derniereEcheance}</div></div>
+    </div>`;
+    html+=`<div class="card">
+      <div class="ct">Progression du remboursement</div>
+      <div class="gauge-wrap">
+        <div class="ring" style="background:conic-gradient(var(--orange) ${finPct.toFixed(1)}%, #E7E3DA ${finPct.toFixed(1)}% 100%)"><div class="ring-c"><b class="num">${finPct.toFixed(0)}%</b><span>remboursé</span></div></div>
+        <div class="gauge-meta">
+          <div class="gm"><span>Capital emprunté</span><b class="num">${fmt(PRET_INFO.montant)} F</b></div>
+          <div class="gm"><span>Capital remboursé</span><b class="num">${fmt(s.rembourse)} F</b></div>
+          <div class="gm"><span>Capital restant dû</span><b class="num">${fmt(s.resteDu)} F</b></div>
+          <div class="gm-note">Taux d’intérêt ${PRET_INFO.tauxInterets}% · assurance ${PRET_INFO.tauxAssurance}% · mise en place le ${PRET_INFO.dateMiseEnPlace}, 1ère échéance le ${PRET_INFO.premiereEcheance}.</div>
+        </div>
+      </div>
+    </div>`;
+    const links=pretAllLinks();
+    html+=`<div class="card">
+      <div class="ct">Échéancier · ${PRET_INFO.nbEcheances} mensualités</div>
+      <p class="eq-todo-txt" style="margin:-6px 0 12px">« Payée » suit la date prévue de l’échéance. « Marquer payé » crée la vraie opération de dépense depuis Banque (SGBCI) dans le journal, pour le mois en cours.</p>
+      <div class="pilot-table-wrap"><table class="vtable">
+        <thead><tr><th>N°</th><th>Échéance</th><th style="text-align:right">Capital</th><th style="text-align:right">Intérêts</th><th style="text-align:right">Assurance</th><th style="text-align:right">Total</th><th style="text-align:right">Restant dû</th><th>Statut</th><th></th></tr></thead>
+        <tbody>${PRET_ECHEANCES.map(e=>{ const link=links[e.no]; const paid=!!link||pretIsPaid(e); const cur=s.next&&s.next.no===e.no;
+          return `<tr${cur?' style="background:var(--fill)"':''}>
+            <td>${e.no}</td><td>${e.date}</td>
+            <td class="vamt">${fmt(e.capital)}</td><td class="vamt">${fmt(e.interets)}</td><td class="vamt">${fmt(e.assurance)}</td>
+            <td class="vamt">${fmt(e.montant)}</td><td class="vamt">${fmt(e.reste)}</td>
+            <td><span class="pill ${paid?'dispo':'bloque'}">${paid?'Payée':'À venir'}</span></td>
+            <td>${link
+              ? `<button type="button" class="iconbtn" data-pret-undo="${e.no}" title="Retirer l’opération liée">Annuler</button>`
+              : `<button type="button" class="iconbtn" data-pret-pay="${e.no}">Marquer payé</button>`}</td>
+          </tr>`; }).join('')}</tbody>
+      </table></div>
+    </div>`;
+    root.innerHTML=html;
+    root.querySelectorAll('[data-pret-pay]').forEach(b=>b.onclick=()=>{ const e=PRET_ECHEANCES.find(x=>x.no===+b.dataset.pretPay); if(e) pretMarkPaid(e); });
+    root.querySelectorAll('[data-pret-undo]').forEach(b=>b.onclick=()=>{ const e=PRET_ECHEANCES.find(x=>x.no===+b.dataset.pretUndo); if(e) pretUnmark(e); });
+  }
+
   /* ============================================================ misc */
   let toastT;
   function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800); }
-  function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); fillRevSelect(); renderHist(); renderBourse(); }
+  function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); renderHist(); renderBourse(); }
   function switchTab(name, push){
     if(push===undefined) push=true;
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
@@ -1660,8 +1812,9 @@
     if(name==='coffres') renderCoffres();
     if(name==='hist') renderHist();
     if(name==='pilot') renderPilot();
-    if(name==='vent') renderVent();
+    if(name==='vent') renderBudget();
     if(name==='bourse') renderBourse();
+    if(name==='pret') renderPret();
     const path=TAB_ROUTES[name];
     if(push && path && location.pathname!==path){ try{ history.pushState({tab:name}, '', path); }catch(e){} }
     // Mémorise le dernier onglet visité (local à l'appareil, jamais synchronisé
@@ -1676,7 +1829,7 @@
     const backdrop=document.getElementById('sheetBackdrop');
     const qa=document.getElementById('quickAddBtn');
     if(qa) qa.onclick=()=>{ switchTab('ops'); openForm(null); };
-    if(backdrop) backdrop.onclick=()=>{ closeForm(); closeXForm(); closeVentForm(); closeBourseForms(); };
+    if(backdrop) backdrop.onclick=()=>{ closeForm(); closeXForm(); closeBourseForms(); };
     const sheetIds=['opForm','xForm','ventForm','brsAchatForm','brsDivForm','brsVenteForm'];
     const obs=new MutationObserver(()=>{
       const anyOpen = sheetIds.some(id=>document.getElementById(id)?.classList.contains('open'));
@@ -1686,8 +1839,9 @@
   }
   function init(){
     setActive(cycles.activeId);
+    injectPretTab();
     initTabs(); setupMobileNav(); initQuickAdd(); fillCompteSelects(); buildMonthSelect();
-    renderDash(); renderOps(); renderCoffres(); renderVent(); fillRevSelect(); renderHist(); renderBourse();
+    renderDash(); renderOps(); renderCoffres(); renderBudget(); renderHist(); renderBourse();
     document.getElementById('addBtn').onclick=()=>openForm(null);
     document.getElementById('xAddBtn').onclick=()=>openXForm('pay');
     document.getElementById('xDonBtn').onclick=()=>openXForm('don');
@@ -1702,10 +1856,6 @@
     document.getElementById('fDetteToggle').onclick=()=>setDetteToggle(document.getElementById('fDetteToggle').getAttribute('aria-pressed')!=='true');
     document.getElementById('fType').onchange=syncType;
     document.querySelectorAll('#fTypeSeg .typeopt').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#fTypeSeg .typeopt').forEach(x=>x.classList.remove('active')); b.classList.add('active'); document.getElementById('fType').value=b.dataset.t; syncType(); });
-    document.getElementById('ventAddBtn').onclick=()=>openVentForm(null);
-    document.getElementById('vfCancel').onclick=closeVentForm;
-    document.getElementById('vfSave').onclick=saveVentForm;
-    document.getElementById('vfFromRev').onchange=e=>{ const revs=e.target._revs||[]; const o=revs[+e.target.value]; if(o){ document.getElementById('vfLabel').value=o.lib; document.getElementById('vfDate').value=o.date; document.getElementById('vfMontant').value=Math.abs(o.montant); } };
     document.getElementById('opSearch').oninput=e=>{ filterText=e.target.value; opPage=0; renderOps(); };
     document.getElementById('catFilter').onchange=e=>{ filterCat=e.target.value; opPage=0; renderOps(); };
     document.querySelectorAll('#typeChips .typechip').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#typeChips .typechip').forEach(x=>x.classList.remove('active')); b.classList.add('active'); filterType=b.dataset.type; opPage=0; renderOps(); });

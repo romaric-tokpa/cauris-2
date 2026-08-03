@@ -22,8 +22,9 @@ const nextConfig = {
       { source: "/suivi", destination: "/" },
       { source: "/operations", destination: "/" },
       { source: "/coffres", destination: "/" },
-      { source: "/ventilation", destination: "/" },
+      { source: "/budget", destination: "/" },
       { source: "/bourse", destination: "/" },
+      { source: "/pret", destination: "/" },
     ];
   },
 };
