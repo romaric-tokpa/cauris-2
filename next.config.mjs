@@ -25,6 +25,7 @@ const nextConfig = {
       { source: "/budget", destination: "/" },
       { source: "/bourse", destination: "/" },
       { source: "/pret", destination: "/" },
+      { source: "/fleetos", destination: "/" },
     ];
   },
 };
