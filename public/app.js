@@ -60,7 +60,7 @@
   let opPage=0, opPageSize=25, xMode='pay';
   let histView='jour';
   /* Chaque onglet a sa propre URL (voir rewrites next.config.mjs). */
-  const TAB_ROUTES={ dash:'/', pilot:'/suivi', ops:'/operations', coffres:'/coffres', vent:'/budget', bourse:'/bourse', pret:'/pret' };
+  const TAB_ROUTES={ dash:'/', pilot:'/suivi', ops:'/operations', coffres:'/coffres', vent:'/budget', bourse:'/bourse', pret:'/pret', fleetos:'/fleetos' };
   function tabFromPath(){ const p=(location.pathname||'/').replace(/\/+$/,'')||'/'; for(const t in TAB_ROUTES){ if(TAB_ROUTES[t]===p) return t; } return 'dash'; }
 
   function setActive(id){
@@ -1566,7 +1566,8 @@
     {tab:'ops',   label:'Opérations', icon:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.3"/><circle cx="3.5" cy="12" r="1.3"/><circle cx="3.5" cy="18" r="1.3"/>'},
     {tab:'vent',  label:'Budget',     icon:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/>'},
     {tab:'bourse',label:'Bourse',     icon:'<path d="M4 20V4M4 20h16"/><path d="M8 16l3.5-4 3 3L20 8"/>'},
-    {tab:'pret',  label:'Prêt',       icon:'<rect x="2" y="7" width="20" height="13" rx="2"/><path d="M2 11h20"/><path d="M6 15h4"/>'}
+    {tab:'pret',  label:'Prêt',       icon:'<rect x="2" y="7" width="20" height="13" rx="2"/><path d="M2 11h20"/><path d="M6 15h4"/>'},
+    {tab:'fleetos', label:'FleetOS', icon:'<path d="M3 17h13l3 4H3z"/><path d="M6 17V9l4-4h4l4 4v8"/><circle cx="7.5" cy="20.5" r="1.5"/><circle cx="16.5" cy="20.5" r="1.5"/>'}
   ];
   const BN_ICONS={
     dash:'<path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/>',
@@ -1794,6 +1795,162 @@
     root.querySelectorAll('[data-pret-undo]').forEach(b=>b.onclick=()=>{ const e=PRET_ECHEANCES.find(x=>x.no===+b.dataset.pretUndo); if(e) pretUnmark(e); });
   }
 
+  /* ============================================================
+     ONGLET FLEETOS — plan d'autofinancement (coffre "Projet FleetOS")
+     ------------------------------------------------------------
+     Plan sur 48 mois importé de FleetOS_Autofinancement.xlsx : achat cash
+     de véhicules (6 M/véhicule) autofinancé par l'épargne perso (370k/mois
+     avant 2027, 670k/mois dès jan. 2027) puis par le revenu de la flotte
+     déjà en service. Démarre en août 2026, zéro dette. Le suivi compare
+     l'épargne RÉELLE du coffre "Projet FleetOS" (compte du même nom,
+     alimenté par de vrais virements dans le journal) à la trajectoire
+     prévue ci-dessous — indépendant des cycles mensuels, comme Bourse/Prêt.
+     ============================================================ */
+  const FLEETOS_INFO={
+    coffre:'Projet FleetOS', prixVehicule:6000000, revenuVehiculeMois:290000,
+    epargneAvant2027:370000, epargneDes2027:670000,
+    debut:'août 2026', horizon:'juillet 2030 (mois 48)'
+  };
+  // [mois n (1=août 2026), année, mm calendaire, libellé, épargne perso prévue
+  //  ce mois, revenu flotte prévu, trésorerie cumulée prévue en fin de mois,
+  //  véhicule(s) acheté(s) ce mois, véhicules en service en fin de mois,
+  //  valeur de flotte prévue, patrimoine FleetOS prévu (trésorerie+flotte)]
+  const FLEETOS_PLAN=[
+    {n:1,y:2026,mm:'08',label:'août 2026',epargne:370000,revenuFlotte:0,tresoFin:370000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:370000},
+    {n:2,y:2026,mm:'09',label:'septembre 2026',epargne:370000,revenuFlotte:0,tresoFin:740000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:740000},
+    {n:3,y:2026,mm:'10',label:'octobre 2026',epargne:370000,revenuFlotte:0,tresoFin:1110000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:1110000},
+    {n:4,y:2026,mm:'11',label:'novembre 2026',epargne:370000,revenuFlotte:0,tresoFin:1480000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:1480000},
+    {n:5,y:2026,mm:'12',label:'décembre 2026',epargne:370000,revenuFlotte:0,tresoFin:1850000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:1850000},
+    {n:6,y:2027,mm:'01',label:'janvier 2027',epargne:670000,revenuFlotte:0,tresoFin:2520000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:2520000},
+    {n:7,y:2027,mm:'02',label:'février 2027',epargne:670000,revenuFlotte:0,tresoFin:3190000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:3190000},
+    {n:8,y:2027,mm:'03',label:'mars 2027',epargne:670000,revenuFlotte:0,tresoFin:3860000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:3860000},
+    {n:9,y:2027,mm:'04',label:'avril 2027',epargne:670000,revenuFlotte:0,tresoFin:4530000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:4530000},
+    {n:10,y:2027,mm:'05',label:'mai 2027',epargne:670000,revenuFlotte:0,tresoFin:5200000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:5200000},
+    {n:11,y:2027,mm:'06',label:'juin 2027',epargne:670000,revenuFlotte:0,tresoFin:5870000,achats:0,vehFin:0,valeurFlotte:0,patrimoine:5870000},
+    {n:12,y:2027,mm:'07',label:'juillet 2027',epargne:670000,revenuFlotte:0,tresoFin:540000,achats:1,vehFin:1,valeurFlotte:6000000,patrimoine:6540000},
+    {n:13,y:2027,mm:'08',label:'août 2027',epargne:670000,revenuFlotte:290000,tresoFin:1500000,achats:0,vehFin:1,valeurFlotte:6000000,patrimoine:7500000},
+    {n:14,y:2027,mm:'09',label:'septembre 2027',epargne:670000,revenuFlotte:290000,tresoFin:2460000,achats:0,vehFin:1,valeurFlotte:6000000,patrimoine:8460000},
+    {n:15,y:2027,mm:'10',label:'octobre 2027',epargne:670000,revenuFlotte:290000,tresoFin:3420000,achats:0,vehFin:1,valeurFlotte:6000000,patrimoine:9420000},
+    {n:16,y:2027,mm:'11',label:'novembre 2027',epargne:670000,revenuFlotte:290000,tresoFin:4380000,achats:0,vehFin:1,valeurFlotte:6000000,patrimoine:10380000},
+    {n:17,y:2027,mm:'12',label:'décembre 2027',epargne:670000,revenuFlotte:290000,tresoFin:5340000,achats:0,vehFin:1,valeurFlotte:6000000,patrimoine:11340000},
+    {n:18,y:2028,mm:'01',label:'janvier 2028',epargne:670000,revenuFlotte:290000,tresoFin:300000,achats:1,vehFin:2,valeurFlotte:12000000,patrimoine:12300000},
+    {n:19,y:2028,mm:'02',label:'février 2028',epargne:670000,revenuFlotte:580000,tresoFin:1550000,achats:0,vehFin:2,valeurFlotte:12000000,patrimoine:13550000},
+    {n:20,y:2028,mm:'03',label:'mars 2028',epargne:670000,revenuFlotte:580000,tresoFin:2800000,achats:0,vehFin:2,valeurFlotte:12000000,patrimoine:14800000},
+    {n:21,y:2028,mm:'04',label:'avril 2028',epargne:670000,revenuFlotte:580000,tresoFin:4050000,achats:0,vehFin:2,valeurFlotte:12000000,patrimoine:16050000},
+    {n:22,y:2028,mm:'05',label:'mai 2028',epargne:670000,revenuFlotte:580000,tresoFin:5300000,achats:0,vehFin:2,valeurFlotte:12000000,patrimoine:17300000},
+    {n:23,y:2028,mm:'06',label:'juin 2028',epargne:670000,revenuFlotte:580000,tresoFin:550000,achats:1,vehFin:3,valeurFlotte:18000000,patrimoine:18550000},
+    {n:24,y:2028,mm:'07',label:'juillet 2028',epargne:670000,revenuFlotte:870000,tresoFin:2090000,achats:0,vehFin:3,valeurFlotte:18000000,patrimoine:20090000},
+    {n:25,y:2028,mm:'08',label:'août 2028',epargne:670000,revenuFlotte:870000,tresoFin:3630000,achats:0,vehFin:3,valeurFlotte:18000000,patrimoine:21630000},
+    {n:26,y:2028,mm:'09',label:'septembre 2028',epargne:670000,revenuFlotte:870000,tresoFin:5170000,achats:0,vehFin:3,valeurFlotte:18000000,patrimoine:23170000},
+    {n:27,y:2028,mm:'10',label:'octobre 2028',epargne:670000,revenuFlotte:870000,tresoFin:710000,achats:1,vehFin:4,valeurFlotte:24000000,patrimoine:24710000},
+    {n:28,y:2028,mm:'11',label:'novembre 2028',epargne:670000,revenuFlotte:1160000,tresoFin:2540000,achats:0,vehFin:4,valeurFlotte:24000000,patrimoine:26540000},
+    {n:29,y:2028,mm:'12',label:'décembre 2028',epargne:670000,revenuFlotte:1160000,tresoFin:4370000,achats:0,vehFin:4,valeurFlotte:24000000,patrimoine:28370000},
+    {n:30,y:2029,mm:'01',label:'janvier 2029',epargne:670000,revenuFlotte:1160000,tresoFin:200000,achats:1,vehFin:5,valeurFlotte:30000000,patrimoine:30200000},
+    {n:31,y:2029,mm:'02',label:'février 2029',epargne:670000,revenuFlotte:1450000,tresoFin:2320000,achats:0,vehFin:5,valeurFlotte:30000000,patrimoine:32320000},
+    {n:32,y:2029,mm:'03',label:'mars 2029',epargne:670000,revenuFlotte:1450000,tresoFin:4440000,achats:0,vehFin:5,valeurFlotte:30000000,patrimoine:34440000},
+    {n:33,y:2029,mm:'04',label:'avril 2029',epargne:670000,revenuFlotte:1450000,tresoFin:560000,achats:1,vehFin:6,valeurFlotte:36000000,patrimoine:36560000},
+    {n:34,y:2029,mm:'05',label:'mai 2029',epargne:670000,revenuFlotte:1740000,tresoFin:2970000,achats:0,vehFin:6,valeurFlotte:36000000,patrimoine:38970000},
+    {n:35,y:2029,mm:'06',label:'juin 2029',epargne:670000,revenuFlotte:1740000,tresoFin:5380000,achats:0,vehFin:6,valeurFlotte:36000000,patrimoine:41380000},
+    {n:36,y:2029,mm:'07',label:'juillet 2029',epargne:670000,revenuFlotte:1740000,tresoFin:1790000,achats:1,vehFin:7,valeurFlotte:42000000,patrimoine:43790000},
+    {n:37,y:2029,mm:'08',label:'août 2029',epargne:670000,revenuFlotte:2030000,tresoFin:4490000,achats:0,vehFin:7,valeurFlotte:42000000,patrimoine:46490000},
+    {n:38,y:2029,mm:'09',label:'septembre 2029',epargne:670000,revenuFlotte:2030000,tresoFin:1190000,achats:1,vehFin:8,valeurFlotte:48000000,patrimoine:49190000},
+    {n:39,y:2029,mm:'10',label:'octobre 2029',epargne:670000,revenuFlotte:2320000,tresoFin:4180000,achats:0,vehFin:8,valeurFlotte:48000000,patrimoine:52180000},
+    {n:40,y:2029,mm:'11',label:'novembre 2029',epargne:670000,revenuFlotte:2320000,tresoFin:1170000,achats:1,vehFin:9,valeurFlotte:54000000,patrimoine:55170000},
+    {n:41,y:2029,mm:'12',label:'décembre 2029',epargne:670000,revenuFlotte:2610000,tresoFin:4450000,achats:0,vehFin:9,valeurFlotte:54000000,patrimoine:58450000},
+    {n:42,y:2030,mm:'01',label:'janvier 2030',epargne:670000,revenuFlotte:2610000,tresoFin:1730000,achats:1,vehFin:10,valeurFlotte:60000000,patrimoine:61730000},
+    {n:43,y:2030,mm:'02',label:'février 2030',epargne:670000,revenuFlotte:2900000,tresoFin:5300000,achats:0,vehFin:10,valeurFlotte:60000000,patrimoine:65300000},
+    {n:44,y:2030,mm:'03',label:'mars 2030',epargne:670000,revenuFlotte:2900000,tresoFin:2870000,achats:1,vehFin:11,valeurFlotte:66000000,patrimoine:68870000},
+    {n:45,y:2030,mm:'04',label:'avril 2030',epargne:670000,revenuFlotte:3190000,tresoFin:730000,achats:1,vehFin:12,valeurFlotte:72000000,patrimoine:72730000},
+    {n:46,y:2030,mm:'05',label:'mai 2030',epargne:670000,revenuFlotte:3480000,tresoFin:4880000,achats:0,vehFin:12,valeurFlotte:72000000,patrimoine:76880000},
+    {n:47,y:2030,mm:'06',label:'juin 2030',epargne:670000,revenuFlotte:3480000,tresoFin:3030000,achats:1,vehFin:13,valeurFlotte:78000000,patrimoine:81030000},
+    {n:48,y:2030,mm:'07',label:'juillet 2030',epargne:670000,revenuFlotte:3770000,tresoFin:1470000,achats:1,vehFin:14,valeurFlotte:84000000,patrimoine:85470000}
+  ];
+  /* Mois du plan correspondant à aujourd'hui (n=1 -> août 2026), borné à [1,48]. */
+  function fleetosMonthIndex(){
+    const t=new Date();
+    const n=(t.getFullYear()-2026)*12 + ((t.getMonth()+1)-8) + 1;
+    return Math.max(1, Math.min(48, n));
+  }
+  function fleetosRow(n){ return FLEETOS_PLAN.find(r=>r.n===n) || FLEETOS_PLAN[FLEETOS_PLAN.length-1]; }
+  /* Épargne réelle = solde live du coffre "Projet FleetOS" (coffre vivant,
+     cf. liveCoffres — se recale automatiquement sur le compte du même nom). */
+  function fleetosLiveEpargne(){ const c=liveCoffres().find(x=>x.nom===FLEETOS_INFO.coffre); return c? c.epargne : 0; }
+  function fleetosSummary(){
+    const n=fleetosMonthIndex();
+    const cur=fleetosRow(n);
+    const prev=n>1? fleetosRow(n-1) : null;
+    const nextAchat=FLEETOS_PLAN.find(r=>r.achats>0 && r.n>=n) || null;
+    const vivant=fleetosLiveEpargne();
+    const ecart=vivant-cur.tresoFin;
+    return { n, cur, prev, nextAchat, vivant, ecart };
+  }
+  function injectFleetosTab(){
+    const tabs=document.querySelector('.topbar .tabs');
+    if(tabs && !tabs.querySelector('[data-tab="fleetos"]')){
+      const btn=document.createElement('button');
+      btn.className='tab'; btn.dataset.tab='fleetos'; btn.textContent='FleetOS';
+      const pret=tabs.querySelector('[data-tab="pret"]');
+      if(pret) pret.insertAdjacentElement('afterend', btn); else tabs.appendChild(btn);
+      btn.onclick=()=>switchTab('fleetos');
+    }
+    if(!document.getElementById('panel-fleetos')){
+      const main=document.querySelector('main.wrap');
+      const sec=document.createElement('section');
+      sec.className='panel'; sec.id='panel-fleetos'; sec.setAttribute('data-screen-label','FleetOS');
+      sec.innerHTML=
+        '<div class="sec-title"><span class="n">▸</span><h2>Projet FleetOS</h2>'+
+        `<span class="sub">Autofinancement 100% cash, zéro dette · démarré ${FLEETOS_INFO.debut} · horizon ${FLEETOS_INFO.horizon}</span></div>`+
+        '<div id="fleetosRoot"></div>';
+      if(main) main.appendChild(sec);
+    }
+  }
+  function renderFleetos(){
+    const root=document.getElementById('fleetosRoot'); if(!root) return;
+    const s=fleetosSummary();
+    const objPct=Math.max(0,Math.min(100, s.vivant/FLEETOS_INFO.prixVehicule*100));
+    const enAvance=s.ecart>=0;
+    let html='';
+    html+=`<div class="kpis">
+      <div class="kpi dark"><div class="k">Épargné dans le coffre</div><div class="v num">${fmt(s.vivant)}<span class="cur">FCFA</span></div><div class="d">Compte &amp; coffre « ${FLEETOS_INFO.coffre} »</div></div>
+      <div class="kpi"><div class="k">Prévu à ce stade (${s.cur.label})</div><div class="v num">${fmt(s.cur.tresoFin)}<span class="cur">F</span></div><div class="d">Mois ${s.n} / 48 du plan</div></div>
+      <div class="kpi${enAvance?' rev':' accent'}"><div class="k">${enAvance?'Avance sur le plan':'Retard sur le plan'}</div><div class="v num">${enAvance?'+':'−'}${fmt(Math.abs(s.ecart))}<span class="cur">F</span></div><div class="d">Vs trésorerie cumulée prévue</div></div>
+      <div class="kpi"><div class="k">${s.nextAchat?'Prochain véhicule prévu':'Flotte au complet (48 mois)'}</div><div class="v num">${s.nextAchat?('n°'+s.nextAchat.vehFin):(''+FLEETOS_PLAN[FLEETOS_PLAN.length-1].vehFin)}<span class="cur"></span></div><div class="d">${s.nextAchat?s.nextAchat.label:'—'}</div></div>
+    </div>`;
+    html+=`<div class="card">
+      <div class="ct">Vers le 1er véhicule (achat cash, ${fmt(FLEETOS_INFO.prixVehicule)} F)</div>
+      <div class="gauge-wrap">
+        <div class="ring" style="background:conic-gradient(var(--orange) ${objPct.toFixed(1)}%, #E7E3DA ${objPct.toFixed(1)}% 100%)"><div class="ring-c"><b class="num">${objPct.toFixed(0)}%</b><span>épargné</span></div></div>
+        <div class="gauge-meta">
+          <div class="gm"><span>Prix du 1er véhicule</span><b class="num">${fmt(FLEETOS_INFO.prixVehicule)} F</b></div>
+          <div class="gm"><span>Épargné à ce jour</span><b class="num">${fmt(s.vivant)} F</b></div>
+          <div class="gm"><span>Reste à épargner</span><b class="num">${fmt(Math.max(0,FLEETOS_INFO.prixVehicule-s.vivant))} F</b></div>
+          <div class="gm-note">Épargne perso prévue : ${fmt(FLEETOS_INFO.epargneAvant2027)} F/mois jusqu'à déc. 2026, puis ${fmt(FLEETOS_INFO.epargneDes2027)} F/mois dès jan. 2027 (salaire 900k). Dès qu'un véhicule roule, son revenu net (${fmt(FLEETOS_INFO.revenuVehiculeMois)} F/mois) s'ajoute à l'épargne pour financer le suivant — jamais de crédit.</div>
+        </div>
+      </div>
+    </div>`;
+    html+=`<div class="card">
+      <div class="ct">Trajectoire · ${FLEETOS_PLAN.length} mois</div>
+      <p class="eq-todo-txt" style="margin:-6px 0 12px">Alimentez le coffre « ${FLEETOS_INFO.coffre} » avec de vrais virements dans le journal (Opérations) chaque mois — la ligne « Épargné dans le coffre » ci-dessus suit automatiquement. Le tableau montre la trajectoire prévue par le plan d'autofinancement.</p>
+      <div class="pilot-table-wrap"><table class="vtable">
+        <thead><tr><th>Mois</th><th style="text-align:right">Épargne prévue</th><th style="text-align:right">Revenu flotte</th><th style="text-align:right">Trésorerie prévue</th><th>Véhicules</th><th style="text-align:right">Patrimoine prévu</th><th>Statut</th></tr></thead>
+        <tbody>${FLEETOS_PLAN.map(r=>{
+          const cur=r.n===s.n;
+          const statut = r.n<s.n?'Passé' : (cur?'En cours':'À venir');
+          const statutClass = r.n<s.n?'bloque' : (cur?'dispo':'epargne');
+          return `<tr${cur?' style="background:var(--fill)"':''}>
+            <td>${r.label}</td>
+            <td class="vamt">${fmt(r.epargne)}</td>
+            <td class="vamt">${fmt(r.revenuFlotte)}</td>
+            <td class="vamt">${fmt(r.tresoFin)}</td>
+            <td>${r.vehFin}${r.achats>0?' <span class="pill dispo">+1 achat</span>':''}</td>
+            <td class="vamt">${fmt(r.patrimoine)}</td>
+            <td><span class="pill ${statutClass}">${statut}</span></td>
+          </tr>`; }).join('')}</tbody>
+      </table></div>
+    </div>`;
+    root.innerHTML=html;
+  }
+
   /* ============================================================ misc */
   let toastT;
   function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800); }
@@ -1815,6 +1972,7 @@
     if(name==='vent') renderBudget();
     if(name==='bourse') renderBourse();
     if(name==='pret') renderPret();
+    if(name==='fleetos') renderFleetos();
     const path=TAB_ROUTES[name];
     if(push && path && location.pathname!==path){ try{ history.pushState({tab:name}, '', path); }catch(e){} }
     // Mémorise le dernier onglet visité (local à l'appareil, jamais synchronisé
@@ -1840,6 +1998,7 @@
   function init(){
     setActive(cycles.activeId);
     injectPretTab();
+    injectFleetosTab();
     initTabs(); setupMobileNav(); initQuickAdd(); fillCompteSelects(); buildMonthSelect();
     renderDash(); renderOps(); renderCoffres(); renderBudget(); renderHist(); renderBourse();
     document.getElementById('addBtn').onclick=()=>openForm(null);
