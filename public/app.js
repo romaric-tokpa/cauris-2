@@ -53,56 +53,14 @@
   }
   migratePlacements();
 
-  /* ============================================================
-     Cadre Need / Love / Like / Want (nllw)
-     • 2e dimension d'analyse des DÉPENSES uniquement.
-     • Need+Love = dépenses qui construisent ; Like+Want = à limiter.
-     ============================================================ */
-  const NLLW_KEYS=['need','love','like','want'];
-  const NLLW_META={
-    need:{label:'Need', fr:'Besoin',  color:'#1F8A5B'},
-    love:{label:'Love', fr:'Amour',   color:'#2A6FDB'},
-    like:{label:'Like', fr:'Plaisir', color:'#E08A3C'},
-    want:{label:'Want', fr:'Envie',   color:'#D9694C'}
-  };
-  const NLLW_GOOD=['need','love']; // le « bon côté » (construit la vie)
-  /* Défaut par catégorie — simple suggestion, toujours modifiable.
-     Like & Want ne sont JAMAIS attribués automatiquement (jugements d'intention). */
-  const NLLW_DEFAULTS={
-    'Loyer':'need','Factures':'need','Transport':'need','Nourriture':'need',
-    'Provisions':'need','Santé':'need','Vêtements':'need','Soins perso':'need',
-    'Frais':'need','Frais de transfert':'need','Prêt':'need','Prêt étudiant':'need',
-    'Maison':'love','Copine':'love','Famille':'love','Aide famille':'love',
-    'Départ sœurs':'love','Outils/Web':'love','Transfert':'love'
-    // « Autre » et « Divers » : volontairement non mappés (fourre-tout) — laissés à classer.
-  };
-  /* Catégories dont l'intention varie le plus : sélecteur gardé bien visible
-     même sous le seuil (c'est là que Need vs Want se joue). */
-  const NLLW_VARIABLE=new Set(['Soins perso','Maison','Outils/Web','Autre','Nourriture','Divers','Déco','Loisirs']);
-  function nllwDefaultFor(cat){ return NLLW_DEFAULTS[cat]||''; }
-  function nllwOf(o){ const v=o&&o.nllw; return NLLW_KEYS.includes(v)?v:''; }
-
-  /* ---------- réglages (persistés dans le registre cycles -> Turso) ---------- */
-  const DEFAULT_SETTINGS={ nllwTarget:90, intentionThreshold:3000 };
-  function getSettings(){
-    const s=(cycles&&cycles.settings)||{};
-    const t=Number(s.nllwTarget), th=Number(s.intentionThreshold);
-    return {
-      nllwTarget: (isFinite(t)&&t>=0&&t<=100)? t : DEFAULT_SETTINGS.nllwTarget,
-      intentionThreshold: (isFinite(th)&&th>=0)? th : DEFAULT_SETTINGS.intentionThreshold
-    };
-  }
-  function saveSettings(patch){ cycles.settings=Object.assign({}, getSettings(), patch); saveCycles(); }
-
   /* ---------- active-month state ---------- */
   let M, newOps, dettePaid, ventilations, coffreOverrides, userDettes, opOverrides, opDeletes;
   let ventEditId=null, editingCoffre=null, editIdx=null, repayDetteId=null, ventPicking=null;
-  let fNllwValue='', fNllwTouched=false, fNllwConfirmPending=false;
   let filterText='', filterCat='', filterType='all';
   let opPage=0, opPageSize=25, xMode='pay';
   let histView='jour';
   /* Chaque onglet a sa propre URL (voir rewrites next.config.mjs). */
-  const TAB_ROUTES={ dash:'/', pilot:'/suivi', ops:'/operations', coffres:'/coffres', vent:'/ventilation', bourse:'/bourse', equilibre:'/equilibre' };
+  const TAB_ROUTES={ dash:'/', pilot:'/suivi', ops:'/operations', coffres:'/coffres', vent:'/ventilation', bourse:'/bourse' };
   function tabFromPath(){ const p=(location.pathname||'/').replace(/\/+$/,'')||'/'; for(const t in TAB_ROUTES){ if(TAB_ROUTES[t]===p) return t; } return 'dash'; }
 
   function setActive(id){
@@ -672,31 +630,7 @@
         `</div></div>`;
     }).join('');
     document.querySelectorAll('#acctList [data-acct]').forEach(el=>{ const go=()=>{ filterText=el.dataset.acct; const sb=document.getElementById('opSearch'); if(sb) sb.value=filterText; filterCat=''; filterType='all'; document.querySelectorAll('#typeChips .typechip').forEach(x=>x.classList.toggle('active',x.dataset.type==='all')); opPage=0; document.querySelector('[data-tab=ops]').click(); renderOps(); const f=document.getElementById('opFeed'); if(f) f.scrollIntoView({block:'start'}); toast('Journal filtré : '+filterText); }; el.onclick=go; el.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }; });
-    renderCoherence(k); renderUrgence(); renderTrend(); renderDashNllw();
-  }
-
-  /* ---------- aperçu Équilibre sur le tableau de bord ---------- */
-  function renderDashNllw(){
-    const card=document.getElementById('dashNllw'); if(!card) return;
-    const st=getSettings(), b=nllwBreakdown();
-    if(b.total<=0){ card.style.display='none'; return; }
-    card.style.display='';
-    const ok=b.goodPct>=st.nllwTarget;
-    card.classList.toggle('ok', ok); card.classList.toggle('warn', !ok);
-    const alerts=b.noneCount + intentionToConfirm().length;
-    card.innerHTML=
-      '<div class="eqd-l">'+
-        '<div class="eqd-lab">Équilibre · Need + Love</div>'+
-        `<div class="eqd-val num">${b.goodPct.toFixed(0)}<span class="cur">%</span></div>`+
-        `<div class="eqd-sub">${ok?'✓ au-dessus de la cible':'sous la cible'} · objectif ${st.nllwTarget}%</div>`+
-      '</div>'+
-      '<div class="eqd-r">'+
-        eqSeg(b)+
-        `<div class="eqd-legend">${NLLW_KEYS.map(k=>`<span class="eq-leg"><i style="background:${NLLW_META[k].color}"></i>${NLLW_META[k].label}</span>`).join('')}${b.noneCount>0?`<span class="eq-leg"><i style="background:var(--line-2)"></i>À classer · ${b.noneCount}</span>`:''}</div>`+
-      '</div>'+
-      `<span class="eqd-go">${alerts>0?`<b class="eqd-badge">${alerts}</b> à traiter · `:''}Ouvrir →</span>`;
-    card.onclick=()=>switchTab('equilibre');
-    card.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); switchTab('equilibre'); } };
+    renderCoherence(k); renderUrgence(); renderTrend();
   }
 
   /* ---------- contrôle de cohérence ---------- */
@@ -780,80 +714,6 @@
     return arch.concat(nw).sort((a,b)=> parseDate(b.date)-parseDate(a.date) || (b._seq-a._seq));
   }
 
-  /* ---------- cadre nllw : répartition du mois courant ---------- */
-  function nllwBreakdown(){
-    const deps=allOps().filter(o=>o.type==='dépense');
-    const by={need:0,love:0,like:0,want:0};
-    let unclassified=0, noneCount=0;
-    const total=deps.reduce((s,o)=>s+Math.abs(o.montant),0);
-    deps.forEach(o=>{ const k=nllwOf(o), a=Math.abs(o.montant);
-      if(k) by[k]+=a; else { unclassified+=a; noneCount++; } });
-    const good=by.need+by.love;
-    const goodPct = total>0 ? good/total*100 : 0;
-    return { total, by, good, goodPct, unclassified, noneCount, deps };
-  }
-  /* Répartition nllw d'un cycle quelconque (pour l'historique mois par mois). */
-  function cycleDepBreakdown(cid){
-    const cyc=cycles.months.find(m=>m.id===cid); if(!cyc) return null;
-    const isActive=cid===M.id;
-    const b = isActive ? {newOps, opOverrides, opDeletes} : loadBucket(cid);
-    const arch = cyc.seed ? (S.operations||[]) : (cyc.archive||[]);
-    const ov=b.opOverrides||{}, dels=b.opDeletes||[];
-    const by={need:0,love:0,like:0,want:0}; let total=0, unclassified=0;
-    const add=o=>{ if(!o||o.type!=='dépense') return; const k=nllwOf(o), a=Math.abs(o.montant);
-      total+=a; if(k&&by[k]!=null) by[k]+=a; else unclassified+=a; };
-    arch.forEach((o,i)=>{ if(dels.includes(i)) return; add(ov[i]||o); });
-    (b.newOps||[]).forEach(add);
-    const good=by.need+by.love;
-    return { cid, label:cyc.label, monthName:cyc.monthName, year:cyc.year, mm:cyc.mm,
-      by, total, good, unclassified, goodPct: total>0? good/total*100 : 0 };
-  }
-  /* Nb de points d'attention du mois courant (à classer + intentions à confirmer) — pour la pastille. */
-  function nllwAlertCount(){ const b=nllwBreakdown(); return b.noneCount + intentionToConfirm().length; }
-
-  /* Dépenses > seuil laissées sur le défaut sans confirmation d'intention (mois courant). */
-  function intentionToConfirm(){
-    const th=getSettings().intentionThreshold;
-    return allOps().filter(o=> o.type==='dépense' && nllwOf(o) && !o.nllwConfirmed && Math.abs(o.montant)>=th);
-  }
-
-  /* ---------- classification rétroactive (tous les cycles) ---------- */
-  function saveBucketFor(id, b){
-    try{ localStorage.setItem(bucketKey(id), JSON.stringify({
-      newOps:b.newOps||[], dettePaid:b.dettePaid||{}, ventilations:(b.ventilations!=null?b.ventilations:null),
-      coffreOverrides:b.coffreOverrides||{}, userDettes:b.userDettes||[],
-      opOverrides:b.opOverrides||{}, opDeletes:b.opDeletes||[] })); }catch(e){}
-  }
-  function classifyAllCycles(){
-    let classified=0, kept=0, ambiguous=0;
-    cycles.months.forEach(cyc=>{
-      const isActive = cyc.id===M.id;
-      const b = isActive ? {newOps, opOverrides, opDeletes, ventilations, dettePaid, coffreOverrides, userDettes}
-                         : loadBucket(cyc.id);
-      let changed=false;
-      // 1) opérations saisies (newOps)
-      (b.newOps||[]).forEach(o=>{ if(o.type!=='dépense') return;
-        if(nllwOf(o)){ kept++; return; }
-        const d=nllwDefaultFor(o.cat);
-        // Bulk = acceptation délibérée du défaut -> marqué confirmé (ne pollue pas « à confirmer »).
-        if(d){ o.nllw=d; o.nllwConfirmed=true; classified++; changed=true; } else ambiguous++;
-      });
-      // 2) opérations importées (seed/archive) -> via opOverrides, indexées sur l'archive brute
-      const arch = cyc.seed ? (S.operations||[]) : (cyc.archive||[]);
-      const ov = b.opOverrides||{}; const dels = b.opDeletes||[];
-      arch.forEach((o,i)=>{ if(dels.includes(i) || o.type!=='dépense') return;
-        const cur = ov[i] || o;
-        if(nllwOf(cur)){ kept++; return; }
-        const d=nllwDefaultFor(cur.cat);
-        if(d){ ov[i]=Object.assign({}, cur, {nllw:d, nllwConfirmed:true}); classified++; changed=true; } else ambiguous++;
-      });
-      b.opOverrides=ov;
-      if(isActive){ opOverrides=ov; if(changed) persist(); }
-      else if(changed) saveBucketFor(cyc.id, b);
-    });
-    return { classified, kept, ambiguous };
-  }
-
   function renderOps(){
     const rows=allOps().filter(o=>{
       if(filterType!=='all' && o.type!==filterType) return false;
@@ -895,7 +755,7 @@
         return `<div class="op">
           <span class="op-mark ${cls}">${ic}</span>
           <div class="op-main"><div class="op-lib">${o.lib}${o._new?'<span class="newtag">ajout</span>':''}${o._edited?'<span class="grouptag">modifiée</span>':''}${o._xlink?'<span class="grouptag">liée</span>':''}</div>${o.note?`<div class="op-note">${o.note}</div>`:''}</div>
-          <div class="op-tags">${o._t?`<span class="op-time">${o._t}</span>`:''}<span class="op-compte">${o.compte||''}${dest}</span>${o.cat?`<span class="tcat">${o.cat}</span>`:''}${o.type==='dépense'&&nllwOf(o)?`<span class="nllw-chip nllw-${nllwOf(o)}" title="${NLLW_META[nllwOf(o)].label} · ${NLLW_META[nllwOf(o)].fr}"><i></i>${NLLW_META[nllwOf(o)].label}</span>`:''}</div>
+          <div class="op-tags">${o._t?`<span class="op-time">${o._t}</span>`:''}<span class="op-compte">${o.compte||''}${dest}</span>${o.cat?`<span class="tcat">${o.cat}</span>`:''}</div>
           <div class="op-amt ${cls}">${sign}${fmt(Math.abs(o.montant))}</div>
           <div class="op-act"><button class="iconbtn" data-edit="${o._new?'n':'a'}-${o._i}">Modif.</button><button class="iconbtn" data-del="${o._new?'n':'a'}-${o._i}">Suppr.</button></div>
         </div>`;
@@ -983,77 +843,16 @@
     document.getElementById('formTitle').textContent=(editIdx!=null)?(editIdx[0]==='a'?'Modifier l’opération importée':'Modifier l’opération'):'Nouvelle opération';
     document.getElementById('fFraisWrap').style.display=(editIdx!=null && editIdx[0]==='a')?'none':'';
     setDetteToggle(false); document.getElementById('fEcheance').value='';
-    // Intention Need/Love/Like/Want : valeur existante à l'édition, sinon défaut catégorie.
-    fNllwTouched=false; fNllwConfirmPending=false;
-    const cf0=document.getElementById('fNllwConfirm'); if(cf0) cf0.classList.remove('show');
-    if(o && nllwOf(o)){ setNllwValue(nllwOf(o), false); fNllwTouched=true; }
-    else { setNllwValue(nllwDefaultFor(o?o.cat:currentFormCat()), false); }
-    updateNllwForCategory(false);
     syncType();
     const ld = (o && o._xlink) ? userDettes.find(d=>d._xlink===o._xlink && d.manual) : null;
     if(ld){ setDetteToggle(true); document.getElementById('fEcheance').value=(ld.echeance&&ld.echeance!=='à définir')?ld.echeance:''; }
     document.getElementById('fLib').focus();
   }
   document.addEventListener('change', e=>{
-    if(e.target && e.target.id==='fCat'){ document.getElementById('fCatCustom').style.display = e.target.value==='__custom__' ? '' : 'none'; updateNllwForCategory(false); }
+    if(e.target && e.target.id==='fCat'){ document.getElementById('fCatCustom').style.display = e.target.value==='__custom__' ? '' : 'none'; }
     if(e.target && e.target.id==='xCat'){ document.getElementById('xCatCustom').style.display = e.target.value==='__custom__' ? '' : 'none'; renderXPreview(); }
   });
-  document.addEventListener('input', e=>{ if(e.target && e.target.id==='fCatCustom') updateNllwForCategory(false); });
 
-  /* ---------- sélecteur d'intention Need/Love/Like/Want (formulaire dépense) ---------- */
-  function currentFormCat(){ const s=document.getElementById('fCat'); if(!s) return ''; return s.value==='__custom__' ? document.getElementById('fCatCustom').value.trim() : s.value; }
-  function setNllwValue(v, touched){
-    fNllwValue = NLLW_KEYS.includes(v)? v : '';
-    if(touched) fNllwTouched=true;
-    document.querySelectorAll('#fNllwSeg .nllwopt').forEach(b=> b.classList.toggle('active', (b.dataset.v||'')===fNllwValue));
-  }
-  function updateNllwForCategory(force){
-    const cat=currentFormCat();
-    if(force || !fNllwTouched) setNllwValue(nllwDefaultFor(cat), false);
-    const variable=NLLW_VARIABLE.has(cat);
-    const micro=document.getElementById('fNllwMicro');
-    if(micro) micro.textContent = variable
-      ? 'Ici l’intention varie souvent — besoin réel, ou plaisir / envie du moment ?'
-      : 'Un besoin, ou un plaisir du moment ? Un tap sur Like / Want suffit à reclasser.';
-    const wrap=document.getElementById('fNllwWrap');
-    if(wrap) wrap.classList.toggle('nllw-variable', variable);
-  }
-  function injectNllwUI(){
-    const form=document.getElementById('opForm'); if(!form || document.getElementById('fNllwWrap')) return;
-    const cat=document.getElementById('catWrap');
-    const wrap=document.createElement('div');
-    wrap.id='fNllwWrap'; wrap.className='nllw-field'; wrap.style.marginTop='12px';
-    wrap.innerHTML =
-      '<span class="lab">Intention <span class="nllw-lab-sub">— Need · Love · Like · Want</span></span>'+
-      '<div class="nllwseg" id="fNllwSeg">'+
-        NLLW_KEYS.map(k=>`<button type="button" class="nllwopt nllw-${k}" data-v="${k}"><i style="background:${NLLW_META[k].color}"></i>${NLLW_META[k].label}</button>`).join('')+
-        '<button type="button" class="nllwopt nllw-clear" data-v="">À classer</button>'+
-      '</div>'+
-      '<p class="nllw-micro" id="fNllwMicro">Un besoin, ou un plaisir du moment ?</p>';
-    if(cat && cat.parentNode) cat.parentNode.insertBefore(wrap, cat.nextSibling); else form.appendChild(wrap);
-    wrap.querySelectorAll('.nllwopt').forEach(b=> b.onclick=()=> setNllwValue(b.dataset.v, true));
-    // Confirmation d'intention pour les grosses dépenses (seuil réglable).
-    const actions=form.querySelector('.actions');
-    const cf=document.createElement('div');
-    cf.id='fNllwConfirm'; cf.className='nllw-confirm';
-    cf.innerHTML =
-      '<div class="nllw-confirm-q" id="fNllwConfirmQ"></div>'+
-      '<div class="nllwseg nllw-confirm-seg">'+
-        NLLW_KEYS.map(k=>`<button type="button" class="nllwopt nllw-${k}" data-cv="${k}"><i style="background:${NLLW_META[k].color}"></i>${NLLW_META[k].label}<small>${NLLW_META[k].fr}</small></button>`).join('')+
-      '</div>'+
-      '<button type="button" class="nllw-confirm-skip" id="fNllwConfirmSkip">Garder l’intention proposée</button>';
-    if(actions && actions.parentNode) actions.parentNode.insertBefore(cf, actions); else form.appendChild(cf);
-    cf.querySelectorAll('[data-cv]').forEach(b=> b.onclick=()=>{ setNllwValue(b.dataset.cv, true); fNllwConfirmPending=false; cf.classList.remove('show'); saveForm(); });
-    cf.querySelector('#fNllwConfirmSkip').onclick=()=>{ fNllwTouched=true; fNllwConfirmPending=false; cf.classList.remove('show'); saveForm(); };
-  }
-  function showIntentionConfirm(montant){
-    fNllwConfirmPending=true;
-    const cf=document.getElementById('fNllwConfirm'); if(!cf){ fNllwConfirmPending=false; return; }
-    const q=document.getElementById('fNllwConfirmQ');
-    if(q) q.innerHTML='Cette dépense de <b>'+fmt(montant)+' F</b> — elle construit ta vie <b>(Need / Love)</b>, ou c’est un plaisir / une envie <b>(Like / Want)</b> ?';
-    cf.classList.add('show');
-    try{ cf.scrollIntoView({block:'nearest',behavior:'smooth'}); }catch(e){}
-  }
   function setDetteToggle(on){
     const b=document.getElementById('fDetteToggle'); if(!b) return;
     b.setAttribute('aria-pressed', on?'true':'false');
@@ -1120,8 +919,6 @@
     const showDette=(t==='dépense'||t==='virement');
     document.getElementById('fDetteToggle').style.display=showDette?'':'none';
     if(!showDette) setDetteToggle(false);
-    const nw=document.getElementById('fNllwWrap'); if(nw) nw.style.display=(t==='dépense')?'':'none';
-    if(t!=='dépense'){ const cf=document.getElementById('fNllwConfirm'); if(cf) cf.classList.remove('show'); fNllwConfirmPending=false; }
   }
   function saveForm(){
     const date=document.getElementById('fDate').value.trim();
@@ -1138,19 +935,10 @@
     if(!montant){ toast('Renseigne le montant'); return; }
     if(type==='virement' && !compteDest){ toast('Un virement exige un compte de destination'); return; }
     if(type==='virement' && compteDest===compte){ toast('Source et destination doivent différer'); return; }
-    // Seuil d'intention : au-dessus du seuil, confirmer l'intention avant de valider
-    // (seulement si l'utilisateur n'a pas déjà touché le sélecteur).
-    if(type==='dépense'){
-      const th=getSettings().intentionThreshold;
-      if(Math.abs(montant)>=th && !fNllwTouched && !fNllwConfirmPending){ showIntentionConfirm(Math.abs(montant)); return; }
-    }
     montant=Math.abs(montant)*(type==='dépense'?-1:1);
     const frais=Math.abs(parseFloat(document.getElementById('fFrais').value)||0);
     const op={date,lib,type,compte,cat:type==='virement'?'':cat,montant,note};
     if(type==='virement'&&compteDest) op.compteDest=compteDest;
-    if(type==='dépense'){ op.nllw=fNllwValue||''; if(fNllwTouched) op.nllwConfirmed=true; }
-    fNllwConfirmPending=false;
-    { const cf=document.getElementById('fNllwConfirm'); if(cf) cf.classList.remove('show'); }
 
     const asDette=(type==='dépense'||type==='virement') && document.getElementById('fDetteToggle').getAttribute('aria-pressed')==='true';
 
@@ -1803,49 +1591,15 @@
   }
 
   /* ============================================================
-     Onglet ÉQUILIBRE (Need / Love / Like / Want)
-     ============================================================ */
-  let eqClassifyRecap=null;
-  function injectEquilibreTab(){
-    const tabs=document.querySelector('.topbar .tabs');
-    if(tabs && !tabs.querySelector('[data-tab="equilibre"]')){
-      const btn=document.createElement('button');
-      btn.className='tab'; btn.dataset.tab='equilibre'; btn.textContent='Équilibre';
-      const bourse=tabs.querySelector('[data-tab="bourse"]');
-      if(bourse) bourse.insertAdjacentElement('afterend', btn); else tabs.appendChild(btn);
-      btn.onclick=()=>switchTab('equilibre');
-    }
-    if(!document.getElementById('panel-equilibre')){
-      const main=document.querySelector('main.wrap');
-      const sec=document.createElement('section');
-      sec.className='panel'; sec.id='panel-equilibre'; sec.setAttribute('data-screen-label','Équilibre');
-      sec.innerHTML=
-        '<div class="sec-title"><span class="n">▸</span><h2>Équilibre Need / Love / Like / Want</h2>'+
-        '<span class="sub">Mon argent penche-t-il du bon côté (Need + Love) ?</span></div>'+
-        '<div id="eqRoot"></div>';
-      if(main) main.appendChild(sec);
-    }
-    // Aperçu sur le tableau de bord (inséré juste après le contrôle de cohérence).
-    if(!document.getElementById('dashNllw')){
-      const coh=document.getElementById('cohCard');
-      const card=document.createElement('div');
-      card.className='card eq-dash'; card.id='dashNllw';
-      card.setAttribute('role','button'); card.tabIndex=0; card.style.display='none';
-      if(coh && coh.parentNode) coh.parentNode.insertBefore(card, coh.nextSibling);
-    }
-  }
-
-  /* ============================================================
      Navigation mobile (barre du bas) — 4 entrées max + bouton d'ajout central.
      Accueil · Suivi · (＋) · Coffres · Plus. Le reste (Opérations, Budget,
-     Bourse, Équilibre, Sauvegardes) vit dans une feuille « Plus ».
+     Bourse, Sauvegardes) vit dans une feuille « Plus ».
      ============================================================ */
   const BN_PRIMARY=['dash','pilot','coffres'];
   const BN_MORE=[
     {tab:'ops',   label:'Opérations', icon:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.3"/><circle cx="3.5" cy="12" r="1.3"/><circle cx="3.5" cy="18" r="1.3"/>'},
     {tab:'vent',  label:'Budget',     icon:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/>'},
-    {tab:'bourse',label:'Bourse',     icon:'<path d="M4 20V4M4 20h16"/><path d="M8 16l3.5-4 3 3L20 8"/>'},
-    {tab:'equilibre',label:'Équilibre',icon:'<path d="M12 3v18"/><path d="M5 8l7-5 7 5"/><path d="M4 8v3a8 8 0 0 0 16 0V8"/>', badge:'moreEqBadge'}
+    {tab:'bourse',label:'Bourse',     icon:'<path d="M4 20V4M4 20h16"/><path d="M8 16l3.5-4 3 3L20 8"/>'}
   ];
   const BN_ICONS={
     dash:'<path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/>',
@@ -1863,7 +1617,7 @@
       BN_PRIMARY.slice(0,2).map(t=>`<button class="bn-item" data-tab="${t}">${bnSvg(BN_ICONS[t])}<span>${BN_LABELS[t]}</span></button>`).join('')+
       '<span class="bn-spacer"></span>'+
       `<button class="bn-item" data-tab="coffres">${bnSvg(BN_ICONS.coffres)}<span>${BN_LABELS.coffres}</span></button>`+
-      `<button class="bn-item" id="bnMoreBtn" type="button">${bnSvg(BN_ICONS.more)}<span>Plus</span><b class="bn-badge" id="bnMoreBadge"></b></button>`;
+      `<button class="bn-item" id="bnMoreBtn" type="button">${bnSvg(BN_ICONS.more)}<span>Plus</span></button>`;
     bnav.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ closeMoreSheet(); switchTab(b.dataset.tab); });
     const more=document.getElementById('bnMoreBtn'); if(more) more.onclick=openMoreSheet;
     buildMoreSheet();
@@ -1888,119 +1642,10 @@
   function closeMoreSheet(){ const s=document.getElementById('moreSheet'), b=document.getElementById('moreBackdrop');
     if(b) b.classList.remove('show'); if(s) s.classList.remove('open'); document.body.classList.remove('more-open'); }
 
-  /* Pastille d'alerte (à classer + intentions à confirmer). */
-  function updateNllwAlert(){
-    const n = document.getElementById('panel-equilibre') ? nllwAlertCount() : 0;
-    const top=document.querySelector('.tabs [data-tab="equilibre"]');
-    if(top) top.classList.toggle('has-alert', n>0);
-    const txt = n>0 ? (n>9?'9+':String(n)) : '';
-    ['bnMoreBadge','moreEqBadge'].forEach(id=>{ const el=document.getElementById(id);
-      if(el){ el.textContent=txt; el.style.display = n>0 ? '' : 'none'; } });
-  }
-  /* Reclasse une opération précise (utilisé par « Intention à confirmer »). */
-  function setOpNllw(key, val){
-    const kind=key[0], idx=+key.slice(2);
-    if(kind==='n'){ const o=newOps[idx]; if(!o) return; o.nllw=val||''; o.nllwConfirmed=true; }
-    else { const base=(opOverrides&&opOverrides[idx])||archivedOpsRaw()[idx]; if(!base) return;
-      opOverrides[idx]=Object.assign({}, base, {nllw:val||'', nllwConfirmed:true});
-      if(opDeletes.includes(idx)) opDeletes=opDeletes.filter(x=>x!==idx); }
-    persist(); refreshAll();
-  }
-  function runClassifyAll(){
-    if(!confirm('Classer automatiquement selon les catégories ?\n\nToutes les dépenses NON classées de tous les mois recevront le défaut de leur catégorie (Need / Love). Vos classements manuels ne seront PAS touchés. Action rejouable sans dégât.')) return;
-    const r=classifyAllCycles();
-    eqClassifyRecap=r;
-    refreshAll();
-    toast(r.classified+' dépense'+(r.classified>1?'s':'')+' classée'+(r.classified>1?'s':''));
-  }
-  function eqSeg(b){
-    const total=b.total||1;
-    const parts=NLLW_KEYS.map(k=>({k, v:b.by[k], color:NLLW_META[k].color}));
-    parts.push({k:'none', v:b.unclassified, color:'var(--line-2)'});
-    return '<div class="eq-bar">'+parts.filter(p=>p.v>0).map(p=>
-      `<span class="eq-bar-seg" style="width:${(p.v/total*100).toFixed(2)}%;background:${p.color}" title="${p.k==='none'?'À classer':NLLW_META[p.k].label} · ${fmt(p.v)} F"></span>`).join('')+'</div>';
-  }
-  function renderEquilibre(){
-    const root=document.getElementById('eqRoot'); if(!root) return;
-    const st=getSettings(), b=nllwBreakdown();
-    const target=st.nllwTarget, good=b.good, goodPct=b.goodPct;
-    const like=b.by.like, want=b.by.want, ok=goodPct>=target && b.total>0;
-    const tiles=NLLW_KEYS.map(k=>{ const v=b.by[k], pct=b.total>0?v/b.total*100:0; const m=NLLW_META[k];
-      return `<div class="eq-tile" style="--c:${m.color}">
-        <div class="eq-tile-top"><span class="eq-tile-dot"></span><span class="eq-tile-lab">${m.label}</span><span class="eq-tile-fr">${m.fr}</span></div>
-        <div class="eq-tile-val num">${fmt(v)}<span class="cur">F</span></div>
-        <div class="eq-tile-pct num">${pct.toFixed(1)}%</div></div>`; }).join('');
-
-    let html='';
-    // Chiffre clé
-    html+=`<div class="eq-hero ${ok?'ok':'warn'}">
-      <div class="eq-hero-l">
-        <div class="eq-hero-lab">Need + Love · ${cap(M.monthName)} ${M.year}</div>
-        <div class="eq-hero-val num">${b.total>0?goodPct.toFixed(0):'—'}<span class="cur">%</span></div>
-        <div class="eq-hero-target">${ok?'✓ Au-dessus de la cible':(b.total>0?'Sous la cible':'Aucune dépense ce mois-ci')} · objectif <b>${target}%</b></div>
-      </div>
-      <div class="eq-hero-r">
-        <div class="eq-hero-line"><span class="eq-dot need"></span>Need + Love<b class="num">${fmt(good)} F</b></div>
-        <div class="eq-hero-line"><span class="eq-dot want"></span>Like + Want<b class="num">${fmt(like+want)} F</b></div>
-        <div class="eq-hero-line muted">Total dépenses<b class="num">${fmt(b.total)} F</b></div>
-      </div>
-    </div>`;
-    // Barre 4 segments
-    html+=`<div class="card eq-card"><div class="ct">Répartition des dépenses du mois</div>${eqSeg(b)}
-      <div class="eq-legend">${NLLW_KEYS.map(k=>`<span class="eq-leg"><i style="background:${NLLW_META[k].color}"></i>${NLLW_META[k].label}</span>`).join('')}${b.unclassified>0?'<span class="eq-leg"><i style="background:var(--line-2)"></i>À classer</span>':''}</div></div>`;
-    // Tuiles
-    html+=`<div class="eq-tiles">${tiles}</div>`;
-    // À classer
-    if(b.noneCount>0){
-      html+=`<div class="card eq-card eq-todo"><div class="ct">À classer · ${b.noneCount} dépense${b.noneCount>1?'s':''}</div>
-        <p class="eq-todo-txt">${fmt(b.unclassified)} F de dépenses ce mois-ci n’ont pas encore d’intention. Classez-les à la main dans le journal, ou appliquez le défaut par catégorie ci-dessous.</p></div>`;
-    }
-    // Bouton classification rétroactive (rejouable, tous les mois)
-    html+=`<div class="card eq-card"><div class="ct">Classement automatique</div>
-      <p class="eq-todo-txt">Applique le défaut Need / Love selon la catégorie à <b>toutes les dépenses non classées de tous les mois</b>. Ne touche jamais vos classements manuels — rejouable sans dégât.</p>
-      ${eqClassifyRecap?`<div class="eq-recap"><b>${eqClassifyRecap.classified}</b> classée${eqClassifyRecap.classified>1?'s':''} · <b>${eqClassifyRecap.kept}</b> déjà classée${eqClassifyRecap.kept>1?'s':''} conservée${eqClassifyRecap.kept>1?'s':''} · <b>${eqClassifyRecap.ambiguous}</b> laissée${eqClassifyRecap.ambiguous>1?'s':''} à classer (catégories ambiguës)</div>`:''}
-      <button class="btn btn-dark btn-sm" id="eqClassifyBtn">Classer automatiquement selon les catégories</button></div>`;
-    // Intention à confirmer
-    const toConfirm=intentionToConfirm();
-    if(toConfirm.length){
-      html+=`<div class="card eq-card"><div class="ct">Intention à confirmer · ${toConfirm.length}</div>
-        <p class="eq-todo-txt">Ces dépenses au-dessus du seuil (${fmt(st.intentionThreshold)} F) sont restées sur l’intention proposée. Un tap pour confirmer ou reclasser.</p>
-        <div class="eq-confirm-list">${toConfirm.map(o=>{ const key=(o._new?'n':'a')+'-'+o._i; const cur=nllwOf(o);
-          return `<div class="eq-confirm-row"><div class="eq-confirm-info"><span class="eq-confirm-lib">${o.lib}</span><span class="eq-confirm-amt num">${fmt(Math.abs(o.montant))} F</span></div>
-            <div class="nllwseg eq-confirm-seg" data-key="${key}">${NLLW_KEYS.map(k=>`<button type="button" class="nllwopt nllw-${k} ${cur===k?'active':''}" data-v="${k}"><i style="background:${NLLW_META[k].color}"></i>${NLLW_META[k].label}</button>`).join('')}</div></div>`; }).join('')}</div></div>`;
-    }
-    // Historique Need + Love mois par mois
-    const hist=[...cycles.months].sort((a,b)=>(a.year*12+parseInt(a.mm,10))-(b.year*12+parseInt(b.mm,10)))
-      .map(m=>cycleDepBreakdown(m.id)).filter(x=>x && x.total>0);
-    if(hist.length>1){
-      html+=`<div class="card eq-card"><div class="ct">Historique Need + Love · mois par mois</div>
-        <div class="eq-hist">${hist.map(h=>{ const p=h.goodPct, hit=p>=target, cur=h.cid===M.id;
-          return `<div class="eq-hist-row${cur?' current':''}">
-            <div class="eq-hist-m">${cap(h.monthName)} ${String(h.year).slice(2)}</div>
-            <div class="eq-hist-track"><i class="eq-hist-fill ${hit?'ok':'warn'}" style="width:${Math.min(100,p).toFixed(1)}%"></i><span class="eq-hist-target" style="left:${Math.min(100,target)}%"></span></div>
-            <div class="eq-hist-pct num ${hit?'ok':'warn'}">${p.toFixed(0)}%</div></div>`; }).join('')}</div>
-        <div class="eq-hist-legend"><span class="eq-hist-tick"></span>Le trait vertical marque la cible (${target}%).</div></div>`;
-    }
-    // Réglages
-    html+=`<div class="card eq-card"><div class="ct">Réglages de l’équilibre</div>
-      <div class="eq-settings">
-        <label class="eq-set"><span class="lab">Cible « Need + Love » visée (%)</span><input type="number" id="eqTarget" min="0" max="100" step="1" value="${target}"></label>
-        <label class="eq-set"><span class="lab">Seuil d’intention (F) — confirmer au-dessus</span><input type="number" id="eqThreshold" min="0" step="500" value="${st.intentionThreshold}"></label>
-      </div>
-      <p class="eq-todo-txt" style="margin-top:4px">Sous le seuil, la saisie reste silencieuse (défaut appliqué). Au-dessus, une confirmation d’intention légère s’affiche avant de valider.</p></div>`;
-
-    root.innerHTML=html;
-    const cb=document.getElementById('eqClassifyBtn'); if(cb) cb.onclick=runClassifyAll;
-    const tg=document.getElementById('eqTarget'); if(tg) tg.onchange=e=>{ let v=parseInt(e.target.value,10); if(!isFinite(v))v=DEFAULT_SETTINGS.nllwTarget; v=Math.max(0,Math.min(100,v)); saveSettings({nllwTarget:v}); renderEquilibre(); };
-    const th=document.getElementById('eqThreshold'); if(th) th.onchange=e=>{ let v=parseInt(e.target.value,10); if(!isFinite(v)||v<0)v=DEFAULT_SETTINGS.intentionThreshold; saveSettings({intentionThreshold:v}); renderEquilibre(); };
-    root.querySelectorAll('.eq-confirm-seg').forEach(seg=>{ const key=seg.dataset.key;
-      seg.querySelectorAll('.nllwopt').forEach(btn=> btn.onclick=()=>{ setOpNllw(key, btn.dataset.v); renderEquilibre(); }); });
-  }
-
   /* ============================================================ misc */
   let toastT;
   function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800); }
-  function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); fillRevSelect(); renderHist(); renderBourse(); if(document.getElementById('panel-equilibre')) renderEquilibre(); updateNllwAlert(); }
+  function refreshAll(){ renderDash(); fillCatFilter(); renderOps(); renderCoffres(); fillRevSelect(); renderHist(); renderBourse(); }
   function switchTab(name, push){
     if(push===undefined) push=true;
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
@@ -2017,7 +1662,6 @@
     if(name==='pilot') renderPilot();
     if(name==='vent') renderVent();
     if(name==='bourse') renderBourse();
-    if(name==='equilibre') renderEquilibre();
     const path=TAB_ROUTES[name];
     if(push && path && location.pathname!==path){ try{ history.pushState({tab:name}, '', path); }catch(e){} }
     // Mémorise le dernier onglet visité (local à l'appareil, jamais synchronisé
@@ -2042,9 +1686,8 @@
   }
   function init(){
     setActive(cycles.activeId);
-    injectNllwUI(); injectEquilibreTab();
     initTabs(); setupMobileNav(); initQuickAdd(); fillCompteSelects(); buildMonthSelect();
-    renderDash(); renderOps(); renderCoffres(); renderVent(); fillRevSelect(); renderHist(); renderBourse(); updateNllwAlert();
+    renderDash(); renderOps(); renderCoffres(); renderVent(); fillRevSelect(); renderHist(); renderBourse();
     document.getElementById('addBtn').onclick=()=>openForm(null);
     document.getElementById('xAddBtn').onclick=()=>openXForm('pay');
     document.getElementById('xDonBtn').onclick=()=>openXForm('don');
