@@ -4,8 +4,8 @@ import { SpaceMono_400Regular, SpaceMono_700Bold } from "@expo-google-fonts/spac
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, AppState, type AppStateStatus, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import BiometricGate from "../components/BiometricGate";
 import { AuthProvider, useAuth } from "../lib/AuthContext";
@@ -13,15 +13,37 @@ import { PrefsProvider, useColors, usePrefs } from "../lib/prefs";
 import { ProfileProvider } from "../lib/ProfileContext";
 import { colors as staticColors } from "../lib/theme";
 
+/** Verrouille de nouveau si l'app est restée en arrière-plan au moins ce délai. */
+const IDLE_LOCK_MS = 60 * 1000;
+
 function RootNavigator() {
   const { isLoggedIn, loading } = useAuth();
   const { dark, biometric, loaded: prefsLoaded } = usePrefs();
   const colors = useColors();
   const [unlocked, setUnlocked] = useState(false);
+  const backgroundedAt = useRef<number | null>(null);
+  const biometricRef = useRef(biometric);
+  biometricRef.current = biometric;
 
   useEffect(() => {
     if (!isLoggedIn) setUnlocked(false);
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    function onChange(next: AppStateStatus) {
+      if (next === "background" || next === "inactive") {
+        if (backgroundedAt.current == null) backgroundedAt.current = Date.now();
+        return;
+      }
+      if (next === "active" && backgroundedAt.current != null) {
+        const away = Date.now() - backgroundedAt.current;
+        backgroundedAt.current = null;
+        if (biometricRef.current && away >= IDLE_LOCK_MS) setUnlocked(false);
+      }
+    }
+    const sub = AppState.addEventListener("change", onChange);
+    return () => sub.remove();
+  }, []);
 
   if (loading || !prefsLoaded) {
     return (
