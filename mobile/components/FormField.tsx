@@ -42,6 +42,11 @@ type AmountFieldProps = {
   placeholder?: string;
 };
 
+/** Regroupement par milliers avec espace, comme fmt() (lib/format.ts) — pour afficher un montant en cours de saisie déjà lisible. */
+function groupDigits(digits: string): string {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
 export function AmountField({ fieldLabel, value, onChangeText, sign, color, placeholder = "0" }: AmountFieldProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -52,7 +57,7 @@ export function AmountField({ fieldLabel, value, onChangeText, sign, color, plac
       <View style={styles.amountRow}>
         {sign ? <Text style={[styles.amountSign, { color: resolvedColor }]}>{sign}</Text> : null}
         <TextInput
-          value={value}
+          value={groupDigits(value)}
           onChangeText={(v) => onChangeText(v.replace(/\D/g, ""))}
           keyboardType="numeric"
           placeholder={placeholder}

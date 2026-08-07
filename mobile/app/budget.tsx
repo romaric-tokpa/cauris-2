@@ -6,6 +6,7 @@ import SegmentedBar from "../components/SegmentedBar";
 import Tap from "../components/Tap";
 import { apiFetch, UnauthorizedError } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
+import { currencySymbol } from "../lib/currency";
 import { fmt } from "../lib/format";
 import { maskAmount, useColors, usePrefs } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
@@ -111,7 +112,10 @@ export default function BudgetScreen() {
               </View>
               <Text style={styles.rowAmt}>
                 <Text style={{ fontWeight: "700", color: STATUS_COLOR[r.status] }}>{maskAmount(fmt(r.spent), hideAmounts)}</Text>
-                <Text style={{ color: colors.muted2 }}> / {fmt(r.budget)} F</Text>
+                <Text style={{ color: colors.muted2 }}>
+                  {" "}
+                  / {fmt(r.budget)} {currencySymbol()}
+                </Text>
               </Text>
             </Tap>
           ))

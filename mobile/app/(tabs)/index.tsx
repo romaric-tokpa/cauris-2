@@ -7,19 +7,23 @@ import NotificationsSheet from "../../components/NotificationsSheet";
 import OperationSheet from "../../components/OperationSheet";
 import PulseDot from "../../components/PulseDot";
 import ScreenFade from "../../components/ScreenFade";
+import MultiSegmentedBar from "../../components/MultiSegmentedBar";
 import SegmentedBar from "../../components/SegmentedBar";
 import Tap from "../../components/Tap";
 import { apiFetch, UnauthorizedError } from "../../lib/api";
 import { useAuth } from "../../lib/AuthContext";
+import { currencySymbol } from "../../lib/currency";
 import { fmt } from "../../lib/format";
 import { fetchNotifications } from "../../lib/notifications";
 import { maskAmount, useColors, usePrefs } from "../../lib/prefs";
 import { useProfilePhoto } from "../../lib/ProfileContext";
 import { coffreColorsFor, fonts, type ThemeColors } from "../../lib/theme";
+import { useCountUp } from "../../lib/useCountUp";
 
 type DashboardResponse = {
   monthLabel: string;
   kpis: { disponible: number };
+  accountGroups: { title: string; subtotal: number; pctOfPatrimoine: number; accounts: { nom: string; solde: number; note?: string }[] }[];
 };
 type CoffreItem = { nom: string; epargne: number; objectif: number; pct: number };
 type CoffresResponse = { coffres: CoffreItem[] };
@@ -45,6 +49,7 @@ export default function AccueilScreen() {
   const [notifCount, setNotifCount] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetType, setSheetType] = useState<"dépense" | "revenu" | "virement">("dépense");
+  const displayBalance = useCountUp(dashboard?.kpis.disponible ?? 0);
 
   const load = useCallback(async () => {
     try {
@@ -106,6 +111,9 @@ export default function AccueilScreen() {
     { label: "Analyse", icon: "bar-chart-2", onPress: () => router.push("/analyse") },
   ];
 
+  const dispoGroup = dashboard.accountGroups.find((g) => g.title === "Comptes disponibles");
+  const dispoAccounts = dispoGroup ? [...dispoGroup.accounts].sort((a, b) => b.solde - a.solde) : [];
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScreenFade>
@@ -124,7 +132,7 @@ export default function AccueilScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
-            <Tap style={styles.cyclePill} onPress={() => router.push("/suivi")}>
+            <Tap style={styles.cyclePill} onPress={() => router.push("/plus")}>
               <PulseDot size={8} />
               <View>
                 <Text style={styles.cycleLabelSmall}>Cycle actif</Text>
@@ -148,21 +156,27 @@ export default function AccueilScreen() {
             <Feather name={hideAmounts ? "eye-off" : "eye"} size={15} color={colors.muted} />
           </Pressable>
           <Text style={styles.balanceValue}>
-            {maskAmount(fmt(dashboard.kpis.disponible), hideAmounts)} <Text style={styles.balanceUnit}>F</Text>
+            {maskAmount(fmt(displayBalance), hideAmounts)} <Text style={styles.balanceUnit}>{currencySymbol()}</Text>
           </Text>
-          <View style={styles.balanceActions}>
-            <Tap style={styles.balancePrimary} onPress={() => openSheet("dépense")}>
-              <Feather name="plus" size={16} color="#fff" />
-              <Text style={styles.balancePrimaryText}>Ajouter</Text>
-            </Tap>
-            <Tap style={styles.balanceSecondary} onPress={() => openSheet("virement")}>
-              <Feather name="send" size={15} color={colors.ink} />
-              <Text style={styles.balanceSecondaryText}>Virement</Text>
-            </Tap>
-            <Tap style={styles.balanceMore} onPress={() => router.push("/plus")}>
-              <Feather name="more-horizontal" size={18} color={colors.ink} />
-            </Tap>
-          </View>
+
+          {dispoAccounts.length ? (
+            <View style={styles.compositionWrap}>
+              <MultiSegmentedBar parts={dispoAccounts.map((a, i) => ({ value: a.solde, color: coffreColors[i % coffreColors.length] }))} />
+              <View style={styles.compositionList}>
+                {dispoAccounts.map((a, i) => (
+                  <View key={a.nom} style={styles.compositionRow}>
+                    <View style={styles.compositionLeft}>
+                      <View style={[styles.compositionDot, { backgroundColor: coffreColors[i % coffreColors.length] }]} />
+                      <Text style={styles.compositionNom} numberOfLines={1}>
+                        {a.nom}
+                      </Text>
+                    </View>
+                    <Text style={styles.compositionVal}>{maskAmount(fmt(a.solde), hideAmounts)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <View>
@@ -272,14 +286,15 @@ function createStyles(colors: ThemeColors) {
   balanceCard: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 26, paddingHorizontal: 22, paddingTop: 20, paddingBottom: 16 },
   balanceToggle: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   balanceLabel: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.muted },
-  balanceValue: { fontFamily: fonts.monoBold, fontSize: 38, color: colors.ink, textAlign: "center", letterSpacing: -1.5, marginTop: 8, marginBottom: 20 },
+  balanceValue: { fontFamily: fonts.monoBold, fontSize: 38, color: colors.ink, textAlign: "center", letterSpacing: -1.5, marginTop: 8, marginBottom: 18 },
   balanceUnit: { fontFamily: fonts.sans, fontSize: 20, color: colors.muted },
-  balanceActions: { flexDirection: "row", gap: 10 },
-  balancePrimary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, paddingVertical: 13, borderRadius: 16, backgroundColor: colors.anthracite },
-  balancePrimaryText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: "#fff" },
-  balanceSecondary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, paddingVertical: 13, borderRadius: 16, backgroundColor: colors.screenBg, borderWidth: 1, borderColor: colors.lineSoft },
-  balanceSecondaryText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.ink },
-  balanceMore: { width: 50, paddingVertical: 13, alignItems: "center", justifyContent: "center", borderRadius: 16, backgroundColor: colors.screenBg, borderWidth: 1, borderColor: colors.lineSoft },
+  compositionWrap: { gap: 12 },
+  compositionList: { gap: 9 },
+  compositionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  compositionLeft: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 },
+  compositionDot: { width: 8, height: 8, borderRadius: 4 },
+  compositionNom: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.ink },
+  compositionVal: { fontFamily: fonts.mono, fontSize: 13, color: colors.muted },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   sectionTitle: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.ink },
   sectionLink: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.orange },

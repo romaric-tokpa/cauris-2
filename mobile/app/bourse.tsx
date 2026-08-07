@@ -7,9 +7,11 @@ import Sparkline from "../components/Sparkline";
 import Tap from "../components/Tap";
 import { apiFetch, UnauthorizedError } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
+import { currencySymbol } from "../lib/currency";
 import { fmt } from "../lib/format";
 import { useColors } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
+import { useCountUp } from "../lib/useCountUp";
 
 type PricePoint = { cours: number; date: string; ts: number };
 type PositionItem = {
@@ -52,6 +54,7 @@ export default function BourseScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"achat" | "vente" | "dividende" | "cours">("achat");
   const [sheetCode, setSheetCode] = useState<string | undefined>(undefined);
+  const displayValorisation = useCountUp(data?.valorisation ?? 0);
 
   const load = useCallback(async () => {
     try {
@@ -106,7 +109,7 @@ export default function BourseScreen() {
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>Valorisation</Text>
           <Text style={styles.heroValue}>
-            {fmt(data.valorisation)} <Text style={styles.heroUnit}>F</Text>
+            {fmt(displayValorisation)} <Text style={styles.heroUnit}>{currencySymbol()}</Text>
           </Text>
           <Text style={[styles.heroPl, { color: plColor }]}>
             {up ? "+" : "−"}

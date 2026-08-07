@@ -10,12 +10,13 @@ import SwitchToggle from "../../components/Switch";
 import Tap from "../../components/Tap";
 import { apiFetch, UnauthorizedError } from "../../lib/api";
 import { useAuth } from "../../lib/AuthContext";
+import { fmt } from "../../lib/format";
 import { useColors, usePrefs } from "../../lib/prefs";
 import { removeProfilePhoto, uploadProfilePhoto } from "../../lib/profile";
 import { useProfilePhoto } from "../../lib/ProfileContext";
 import { fonts, type ThemeColors } from "../../lib/theme";
 
-type PilotMonth = { label: string; isActive: boolean };
+type PilotMonth = { label: string; isActive: boolean; revenu: number; depense: number; net: number };
 type PilotResponse = { months: PilotMonth[] };
 
 type MenuItem = { label: string; icon: keyof typeof Feather.glyphMap; bg: string; c: string; onPress: () => void; danger?: boolean };
@@ -26,7 +27,8 @@ export default function PlusScreen() {
   const { dark, toggleDark } = usePrefs();
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [cycleLabel, setCycleLabel] = useState<string | null>(null);
+  const [active, setActive] = useState<PilotMonth | null>(null);
+  const [closing, setClosing] = useState(false);
   const { photo, setPhoto } = useProfilePhoto();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
@@ -34,8 +36,7 @@ export default function PlusScreen() {
     try {
       const res = await apiFetch("/api/pilot");
       const data: PilotResponse = await res.json();
-      const active = data.months.find((m) => m.isActive) ?? data.months[data.months.length - 1];
-      setCycleLabel(active?.label ?? null);
+      setActive(data.months.find((m) => m.isActive) ?? data.months[data.months.length - 1] ?? null);
     } catch (e) {
       if (e instanceof UnauthorizedError) logout();
     }
@@ -46,6 +47,29 @@ export default function PlusScreen() {
       load();
     }, [load]),
   );
+
+  function confirmClose() {
+    Alert.alert(
+      "Clôturer le mois",
+      "Les soldes de comptes et coffres sont reportés comme point de départ du mois suivant. Le mois actuel reste consultable dans l'historique.",
+      [
+        { text: "Annuler", style: "cancel" },
+        { text: "Clôturer", onPress: closeMonth },
+      ],
+    );
+  }
+
+  async function closeMonth() {
+    setClosing(true);
+    try {
+      const res = await apiFetch("/api/pilot/close", { method: "POST" });
+      if (res.ok) await load();
+    } catch (e) {
+      if (e instanceof UnauthorizedError) logout();
+    } finally {
+      setClosing(false);
+    }
+  }
 
   async function pickPhoto() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -95,10 +119,7 @@ export default function PlusScreen() {
     Alert.alert("Photo de profil", undefined, buttons);
   }
 
-  const gestion: MenuItem[] = [
-    { label: "FleetOS", icon: "truck", bg: colors.redBg, c: colors.orange, onPress: () => router.push("/fleetos") },
-    { label: "Suivi mensuel", icon: "bar-chart-2", bg: colors.fillSoft, c: colors.acier, onPress: () => router.push("/suivi") },
-  ];
+  const gestion: MenuItem[] = [{ label: "FleetOS", icon: "truck", bg: colors.redBg, c: colors.orange, onPress: () => router.push("/fleetos") }];
   const systeme: MenuItem[] = [
     { label: "Sauvegardes & restauration", icon: "database", bg: colors.blueBg, c: colors.blue, onPress: () => router.push("/sauvegardes") },
     { label: "Réglages", icon: "settings", bg: colors.fillSoft, c: colors.acier, onPress: () => router.push("/reglages") },
@@ -128,12 +149,35 @@ export default function PlusScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.profileName}>Romaric Tokpa</Text>
               <Text style={styles.profileSub}>Cauris · trésorerie personnelle</Text>
-              <View style={styles.cycleRow}>
-                <PulseDot size={8} />
-                <Text style={styles.cycleText}>{cycleLabel ? `Cycle actif · ${cycleLabel}` : "Cycle actif"}</Text>
-              </View>
             </View>
           </View>
+
+          {active ? (
+            <View style={styles.cycleCard}>
+              <View style={styles.cycleBadgeRow}>
+                <PulseDot size={8} />
+                <Text style={styles.cycleBadgeLabel}>Cycle actif</Text>
+              </View>
+              <Text style={styles.cycleCardLabel}>{active.label}</Text>
+              <View style={styles.cycleStatsRow}>
+                <View>
+                  <Text style={styles.cycleStatLabel}>Revenus</Text>
+                  <Text style={[styles.cycleStatVal, { color: "#4ED88F" }]}>{fmt(active.revenu)}</Text>
+                </View>
+                <View>
+                  <Text style={styles.cycleStatLabel}>Dépenses</Text>
+                  <Text style={[styles.cycleStatVal, { color: "#FF9E7A" }]}>{fmt(active.depense)}</Text>
+                </View>
+                <View>
+                  <Text style={styles.cycleStatLabel}>Net</Text>
+                  <Text style={[styles.cycleStatVal, { color: "#fff" }]}>{fmt(active.net)}</Text>
+                </View>
+              </View>
+              <Tap style={styles.closeBtn} onPress={confirmClose} disabled={closing}>
+                {closing ? <ActivityIndicator color="#fff" /> : <Text style={styles.closeBtnText}>Clôturer le mois</Text>}
+              </Tap>
+            </View>
+          ) : null}
 
           <View>
             <Text style={styles.sectionTitle}>Apparence</Text>
@@ -202,8 +246,15 @@ function createStyles(colors: ThemeColors) {
     },
     profileName: { fontFamily: fonts.sansBold, fontSize: 16, color: "#fff" },
     profileSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted2, marginTop: 2 },
-    cycleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-    cycleText: { fontFamily: fonts.sansSemiBold, fontSize: 12, color: colors.orange },
+    cycleCard: { backgroundColor: colors.anthracite, borderRadius: 22, padding: 20 },
+    cycleBadgeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    cycleBadgeLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2 },
+    cycleCardLabel: { fontFamily: fonts.sansBold, fontSize: 22, color: "#fff", marginTop: 4, marginBottom: 14 },
+    cycleStatsRow: { flexDirection: "row", gap: 22, marginBottom: 16 },
+    cycleStatLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
+    cycleStatVal: { fontFamily: fonts.monoBold, fontSize: 14, marginTop: 2 },
+    closeBtn: { alignItems: "center", padding: 12, borderRadius: 14, backgroundColor: colors.orange },
+    closeBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: "#fff" },
     sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", color: colors.muted2, marginBottom: 6 },
     card: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 18, overflow: "hidden" },
     standaloneRow: { flexDirection: "row", alignItems: "center", gap: 13, backgroundColor: colors.paper, borderRadius: 18, borderWidth: 1, borderColor: colors.lineSoft, padding: 14 },

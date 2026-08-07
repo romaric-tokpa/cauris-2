@@ -1,8 +1,17 @@
-/** Regroupement par milliers avec espace insécable, comme fmt() côté web. Pas d'Intl : évite toute dépendance à l'ICU embarqué dans Hermes. */
+import { convert, getCurrency } from "./currency";
+
+/**
+ * Formate un montant stocké en XOF (FCFA) dans la devise d'affichage
+ * courante (lib/currency.ts). Regroupement par milliers avec espace ; pas
+ * d'Intl pour éviter toute dépendance à l'ICU embarqué dans Hermes.
+ */
 export function fmt(n: number): string {
-  const rounded = Math.round(n);
+  const currency = getCurrency();
+  const converted = convert(n, currency);
+  const decimals = currency === "XOF" ? 0 : 2;
+  const rounded = Math.round(converted * 10 ** decimals) / 10 ** decimals;
   const sign = rounded < 0 ? "−" : "";
-  const digits = Math.abs(rounded).toString();
-  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return sign + grouped;
+  const [intPart, decPart] = Math.abs(rounded).toFixed(decimals).split(".");
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return sign + grouped + (decPart ? "," + decPart : "");
 }

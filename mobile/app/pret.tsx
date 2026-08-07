@@ -5,6 +5,7 @@ import RingProgress from "../components/RingProgress";
 import Tap from "../components/Tap";
 import { apiFetch, UnauthorizedError } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
+import { currencySymbol } from "../lib/currency";
 import { fmt } from "../lib/format";
 import { useColors } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
@@ -79,15 +80,17 @@ export default function PretScreen() {
         </Text>
 
         <View style={styles.heroRow}>
-          <RingProgress pct={finPct} color={colors.blue} label={`${finPct.toFixed(0)}%`} sub="remboursé" size={90} />
+          <RingProgress pct={finPct} color={colors.blue} sub="remboursé" size={90} />
           <View style={{ flex: 1, gap: 10 }}>
             <View>
               <Text style={styles.metaLabel}>Capital restant dû</Text>
-              <Text style={styles.metaValue}>{fmt(summary.resteDu)} F</Text>
+              <Text style={styles.metaValue}>
+                {fmt(summary.resteDu)} {currencySymbol()}
+              </Text>
             </View>
             <View>
               <Text style={styles.metaLabel}>Prochaine échéance</Text>
-              <Text style={[styles.metaValue, { color: colors.orange }]}>{summary.next ? `${fmt(summary.next.montant)} F · ${summary.next.date}` : "Prêt soldé"}</Text>
+              <Text style={[styles.metaValue, { color: colors.orange }]}>{summary.next ? `${fmt(summary.next.montant)} ${currencySymbol()} · ${summary.next.date}` : "Prêt soldé"}</Text>
             </View>
           </View>
         </View>

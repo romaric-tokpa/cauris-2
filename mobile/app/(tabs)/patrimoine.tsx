@@ -9,9 +9,11 @@ import ScreenFade from "../../components/ScreenFade";
 import Tap from "../../components/Tap";
 import { apiFetch, UnauthorizedError } from "../../lib/api";
 import { useAuth } from "../../lib/AuthContext";
+import { currencySymbol } from "../../lib/currency";
 import { fmt } from "../../lib/format";
 import { maskAmount, useColors, usePrefs } from "../../lib/prefs";
 import { fonts, type ThemeColors } from "../../lib/theme";
+import { useCountUp } from "../../lib/useCountUp";
 
 type DashboardResponse = {
   kpis: { patrimoine: number; disponible: number; coffres: number; bloque: number; placement: number };
@@ -56,6 +58,7 @@ export default function PatrimoineScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const displayPatrimoine = useCountUp(data?.kpis.patrimoine ?? 0);
 
   const load = useCallback(async () => {
     try {
@@ -118,7 +121,7 @@ export default function PatrimoineScreen() {
             <Feather name={hideAmounts ? "eye-off" : "eye"} size={14} color={colors.muted2} />
           </Pressable>
           <Text style={styles.heroValue}>
-            {maskAmount(fmt(kpis.patrimoine), hideAmounts)} <Text style={styles.heroUnit}>F</Text>
+            {maskAmount(fmt(displayPatrimoine), hideAmounts)} <Text style={styles.heroUnit}>{currencySymbol()}</Text>
           </Text>
           <View style={styles.repartBar}>
             {parts.map((p) => (
@@ -145,7 +148,9 @@ export default function PatrimoineScreen() {
           <View key={g.title} style={styles.acctGroup}>
             <View style={[styles.acctGroupHead, { borderBottomColor: GROUP_ACCENT[g.title] ?? colors.acier }]}>
               <Text style={styles.acctGroupTitle}>{g.title}</Text>
-              <Text style={styles.acctGroupTotal}>{maskAmount(fmt(g.subtotal), hideAmounts)} F</Text>
+              <Text style={styles.acctGroupTotal}>
+                {maskAmount(fmt(g.subtotal), hideAmounts)} {currencySymbol()}
+              </Text>
             </View>
             {g.accounts.map((a) => (
               <View key={a.nom} style={styles.acctRow}>

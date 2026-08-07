@@ -1,5 +1,6 @@
 import "server-only";
 import type { SeedData } from "./seed";
+import { computeBourse } from "./bourse";
 import { bucketKey, defaultCycles, parseState, resolveCycleContext, resolvedOpsForMonth, round, type Bucket, type Compte, type CycleMonth, type Cycles, type Operation } from "./cycle";
 
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -20,6 +21,8 @@ function categoriesFrom(ops: Operation[], type: "dépense" | "revenu"): { label:
     .sort((a, b) => b.value - a.value);
 }
 
+export type SavingsMovement = { compte: string; montant: number };
+
 export type PilotMonth = {
   id: string;
   label: string;
@@ -30,12 +33,24 @@ export type PilotMonth = {
   tauxPct: number;
   depCategories: { label: string; value: number }[];
   revCategories: { label: string; value: number }[];
+  epargneMois: number;
+  epargneMouvements: SavingsMovement[];
 };
 
 export type PilotResponse = {
   months: PilotMonth[];
-  totals: { revenu: number; depense: number; net: number };
+  totals: { revenu: number; depense: number; net: number; epargne: number };
 };
+
+/** Mouvements nets par compte épargne/bloqué entre deux relevés — pour tracer d'où vient l'épargne du mois. */
+function savingsMovements(baseAccounts: Compte[], endingAccounts: Compte[]): SavingsMovement[] {
+  const baseMap = new Map(baseAccounts.map((c) => [c.nom, c.solde]));
+  return endingAccounts
+    .filter((c) => c.type === "épargne" || c.type === "bloqué")
+    .map((c) => ({ compte: c.nom, montant: round(c.solde - (baseMap.get(c.nom) ?? 0)) }))
+    .filter((m) => m.montant !== 0)
+    .sort((a, b) => Math.abs(b.montant) - Math.abs(a.montant));
+}
 
 export function computePilot(seed: SeedData, state: Record<string, unknown>): PilotResponse {
   const cycles = parseState<Cycles>(state, "cycles", defaultCycles());
@@ -46,6 +61,12 @@ export function computePilot(seed: SeedData, state: Record<string, unknown>): Pi
     const depense = ops.filter((o) => o.type === "dépense").reduce((s, o) => s + Math.abs(o.montant), 0);
     const revenu = ops.filter((o) => o.type === "revenu" || o.type === "dividende").reduce((s, o) => s + Math.abs(o.montant), 0);
     const net = revenu - depense;
+
+    const baseAccounts = accountsSnapshotForMonth(seed, cycles, meta);
+    const endingAccounts = applyOpsDeltas(baseAccounts, ops);
+    const epargneMois = round(savingsTotal(endingAccounts) - savingsTotal(baseAccounts));
+    const epargneMouvements = savingsMovements(baseAccounts, endingAccounts);
+
     return {
       id: meta.id,
       label: meta.label,
@@ -56,12 +77,14 @@ export function computePilot(seed: SeedData, state: Record<string, unknown>): Pi
       tauxPct: revenu > 0 ? Math.round((net / revenu) * 1000) / 10 : 0,
       depCategories: categoriesFrom(ops, "dépense"),
       revCategories: categoriesFrom(ops, "revenu"),
+      epargneMois,
+      epargneMouvements,
     };
   });
 
   const totals = months.reduce(
-    (acc, m) => ({ revenu: acc.revenu + m.revenu, depense: acc.depense + m.depense, net: acc.net + m.net }),
-    { revenu: 0, depense: 0, net: 0 },
+    (acc, m) => ({ revenu: acc.revenu + m.revenu, depense: acc.depense + m.depense, net: acc.net + m.net, epargne: acc.epargne + m.epargneMois }),
+    { revenu: 0, depense: 0, net: 0, epargne: 0 },
   );
 
   return { months, totals };
@@ -87,6 +110,7 @@ export type AnnualResponse = {
   months: AnnualMonth[];
   totals: { revenu: number; depense: number; net: number; tauxPct: number };
   epargne: { totale: number; debutAnnee: number; croissance: number; tauxPct: number };
+  bourse: { achatsAnnee: number; ventesAnnee: number; dividendesAnnee: number; valorisationActuelle: number; investiActuel: number; plusValueLatente: number; plusValuePct: number };
   depCategories: AnnualCategory[];
   revCategories: AnnualCategory[];
   bestMonth: AnnualMonth | null;
@@ -150,6 +174,9 @@ export function computeAnnualAnalysis(seed: SeedData, state: Record<string, unkn
   let totalDepense = 0;
   let epargneDebutAnnee: number | null = null;
   let epargneTotale = 0;
+  let achatsAnnee = 0;
+  let ventesAnnee = 0;
+  let dividendesAnnee = 0;
 
   const months: AnnualMonth[] = MONTHS.map((monthName, i) => {
     const mm = String(i + 1).padStart(2, "0");
@@ -169,6 +196,12 @@ export function computeAnnualAnalysis(seed: SeedData, state: Record<string, unkn
     });
     totalRevenu += revenu;
     totalDepense += depense;
+
+    ops.forEach((o) => {
+      if (o.type === "achat_titre") achatsAnnee += Math.abs(o.montant);
+      else if (o.type === "vente_titre") ventesAnnee += Math.abs(o.montant);
+      else if (o.type === "dividende") dividendesAnnee += Math.abs(o.montant);
+    });
 
     const baseAccounts = accountsSnapshotForMonth(seed, cycles, meta);
     if (epargneDebutAnnee == null) epargneDebutAnnee = round(savingsTotal(baseAccounts));
@@ -197,9 +230,21 @@ export function computeAnnualAnalysis(seed: SeedData, state: Record<string, unkn
       totale: round(epargneTotale),
       debutAnnee: round(epargneDebutAnnee ?? 0),
       croissance: round(epargneTotale - (epargneDebutAnnee ?? 0)),
-      // Part des revenus de l'année réellement mise de côté sur les comptes d'épargne — pas revenu-dépense (voir epargneCroissance).
-      tauxPct: totalRevenu > 0 ? Math.round(((epargneTotale - (epargneDebutAnnee ?? 0)) / totalRevenu) * 1000) / 10 : 0,
+      // Solde total actuel de l'épargne rapporté aux revenus de l'année (pas juste la croissance de la période).
+      tauxPct: totalRevenu > 0 ? Math.round((epargneTotale / totalRevenu) * 1000) / 10 : 0,
     },
+    bourse: (() => {
+      const b = computeBourse(seed, state);
+      return {
+        achatsAnnee: round(achatsAnnee),
+        ventesAnnee: round(ventesAnnee),
+        dividendesAnnee: round(dividendesAnnee),
+        valorisationActuelle: b.valorisation,
+        investiActuel: b.investi,
+        plusValueLatente: b.plusValue,
+        plusValuePct: b.plusValuePct,
+      };
+    })(),
     depCategories: toAnnualCategories(depCatTotals),
     revCategories: toAnnualCategories(revCatTotals),
     bestMonth,

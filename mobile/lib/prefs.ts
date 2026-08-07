@@ -1,11 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode, createElement } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, createElement } from "react";
+import { Appearance } from "react-native";
+import { type Currency, loadPersistedCurrency, setCurrentCurrency, subscribeCurrency } from "./currency";
 import { darkColors, lightColors, type ThemeColors } from "./theme";
 
 /**
  * Préférences locales à l'appareil (jamais synchronisées au backend) : mode
- * sombre, masquage des montants, déverrouillage biométrique. Persistées via
- * AsyncStorage, chargées une fois au démarrage.
+ * sombre, masquage des montants, déverrouillage biométrique, devise
+ * d'affichage. Persistées via AsyncStorage, chargées une fois au démarrage.
  *
  * Un écran ne suit le mode sombre que s'il calcule ses styles via
  * useColors() (voir plus bas) au lieu d'importer `colors` statiquement
@@ -24,10 +26,12 @@ type Prefs = {
   dark: boolean;
   hideAmounts: boolean;
   biometric: boolean;
+  currency: Currency;
   loaded: boolean;
   toggleDark: () => void;
   toggleHideAmounts: () => void;
   toggleBiometric: () => void;
+  setCurrency: (c: Currency) => void;
 };
 
 const PrefsContext = createContext<Prefs | null>(null);
@@ -38,21 +42,42 @@ async function readBool(key: string): Promise<boolean> {
 }
 
 export function PrefsProvider({ children }: { children: ReactNode }) {
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(Appearance.getColorScheme() === "dark");
   const [hideAmounts, setHideAmounts] = useState(false);
   const [biometric, setBiometric] = useState(false);
+  const [currency, setCurrencyState] = useState<Currency>("XOF");
   const [loaded, setLoaded] = useState(false);
+  // Tant que l'utilisateur n'a jamais touché au bouton mode sombre, le thème suit le système (au démarrage et en direct).
+  const darkIsExplicit = useRef(false);
 
   useEffect(() => {
-    Promise.all([readBool(KEYS.dark), readBool(KEYS.hideAmounts), readBool(KEYS.biometric)]).then(([d, h, b]) => {
-      setDark(d);
+    Promise.all([AsyncStorage.getItem(KEYS.dark), readBool(KEYS.hideAmounts), readBool(KEYS.biometric), loadPersistedCurrency()]).then(([storedDark, h, b, c]) => {
+      if (storedDark === "1" || storedDark === "0") {
+        darkIsExplicit.current = true;
+        setDark(storedDark === "1");
+      } else {
+        setDark(Appearance.getColorScheme() === "dark");
+      }
       setHideAmounts(h);
       setBiometric(b);
+      setCurrencyState(c);
       setLoaded(true);
     });
   }, []);
 
+  useEffect(() => {
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      if (!darkIsExplicit.current) setDark(colorScheme === "dark");
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Re-render quand le taux USD (fetch en tâche de fond) arrive, pour que les montants déjà affichés se corrigent.
+  const [, forceRerender] = useState(0);
+  useEffect(() => subscribeCurrency(() => forceRerender((n) => n + 1)), []);
+
   const toggleDark = useCallback(() => {
+    darkIsExplicit.current = true;
     setDark((prev) => {
       const next = !prev;
       AsyncStorage.setItem(KEYS.dark, next ? "1" : "0");
@@ -76,7 +101,16 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  return createElement(PrefsContext.Provider, { value: { dark, hideAmounts, biometric, loaded, toggleDark, toggleHideAmounts, toggleBiometric } }, children);
+  const setCurrency = useCallback((next: Currency) => {
+    setCurrentCurrency(next);
+    setCurrencyState(next);
+  }, []);
+
+  return createElement(
+    PrefsContext.Provider,
+    { value: { dark, hideAmounts, biometric, currency, loaded, toggleDark, toggleHideAmounts, toggleBiometric, setCurrency } },
+    children,
+  );
 }
 
 export function usePrefs(): Prefs {

@@ -67,7 +67,6 @@ function RootNavigator() {
           <Stack.Screen name="bourse" />
           <Stack.Screen name="pret" />
           <Stack.Screen name="fleetos" />
-          <Stack.Screen name="suivi" />
           <Stack.Screen name="sauvegardes" />
           <Stack.Screen name="reglages" />
           <Stack.Screen name="analyse" />

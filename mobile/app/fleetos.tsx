@@ -4,9 +4,11 @@ import OverlayScreen from "../components/OverlayScreen";
 import RingProgress from "../components/RingProgress";
 import { apiFetch, UnauthorizedError } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
+import { currencySymbol } from "../lib/currency";
 import { fmt } from "../lib/format";
 import { useColors } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
+import { useCountUp } from "../lib/useCountUp";
 
 type FleetosRow = {
   n: number;
@@ -32,6 +34,7 @@ export default function FleetosScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [data, setData] = useState<FleetosResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const displayVivant = useCountUp(data?.summary.vivant ?? 0);
 
   const load = useCallback(async () => {
     try {
@@ -76,10 +79,12 @@ export default function FleetosScreen() {
 
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>Épargné dans le coffre</Text>
-          <Text style={styles.heroValue}>{fmt(summary.vivant)} F</Text>
+          <Text style={styles.heroValue}>
+            {fmt(displayVivant)} {currencySymbol()}
+          </Text>
           <Text style={[styles.heroDelta, { color: enAvance ? "#4ED88F" : "#FF9E7A" }]}>
             {enAvance ? "+" : "−"}
-            {fmt(Math.abs(summary.ecart))} F {enAvance ? "d'avance" : "de retard"} sur le plan
+            {fmt(Math.abs(summary.ecart))} {currencySymbol()} {enAvance ? "d'avance" : "de retard"} sur le plan
           </Text>
         </View>
 
@@ -99,17 +104,23 @@ export default function FleetosScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Vers le 1er véhicule ({fmt(info.prixVehicule)} F)</Text>
+          <Text style={styles.cardTitle}>
+            Vers le 1er véhicule ({fmt(info.prixVehicule)} {currencySymbol()})
+          </Text>
           <View style={styles.gaugeRow}>
-            <RingProgress pct={objPct} color={colors.orange} label={`${objPct.toFixed(0)}%`} sub="épargné" size={84} />
+            <RingProgress pct={objPct} color={colors.orange} sub="épargné" size={84} />
             <View style={{ flex: 1, gap: 6 }}>
               <View style={styles.gm}>
                 <Text style={styles.gmLabel}>Épargné à ce jour</Text>
-                <Text style={styles.gmVal}>{fmt(summary.vivant)} F</Text>
+                <Text style={styles.gmVal}>
+                  {fmt(displayVivant)} {currencySymbol()}
+                </Text>
               </View>
               <View style={styles.gm}>
                 <Text style={styles.gmLabel}>Reste à épargner</Text>
-                <Text style={styles.gmVal}>{fmt(Math.max(0, info.prixVehicule - summary.vivant))} F</Text>
+                <Text style={styles.gmVal}>
+                  {fmt(Math.max(0, info.prixVehicule - displayVivant))} {currencySymbol()}
+                </Text>
               </View>
             </View>
           </View>
@@ -129,11 +140,15 @@ export default function FleetosScreen() {
                   <Text style={styles.planLabel} numberOfLines={1}>
                     {r.label}
                   </Text>
-                  <Text style={styles.planCumul}>Cumul prévu {fmt(r.epargneCumulPrevue)} F</Text>
+                  <Text style={styles.planCumul}>
+                    Cumul prévu {fmt(r.epargneCumulPrevue)} {currencySymbol()}
+                  </Text>
                 </View>
                 <View style={{ alignItems: "flex-end" }}>
-                  <Text style={styles.planEpargne}>{fmt(r.epargne)} F prévu</Text>
-                  <Text style={[styles.planReel, { color: reelColor }]}>{r.epargneReelle != null ? `${fmt(r.epargneReelle)} F réel` : "—"}</Text>
+                  <Text style={styles.planEpargne}>
+                    {fmt(r.epargne)} {currencySymbol()} prévu
+                  </Text>
+                  <Text style={[styles.planReel, { color: reelColor }]}>{r.epargneReelle != null ? `${fmt(r.epargneReelle)} ${currencySymbol()} réel` : "—"}</Text>
                   <Text style={[styles.planStat, { color: statutColor }]}>{statut}</Text>
                 </View>
               </View>

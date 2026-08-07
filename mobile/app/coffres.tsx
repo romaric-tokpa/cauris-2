@@ -6,9 +6,11 @@ import RingProgress from "../components/RingProgress";
 import Tap from "../components/Tap";
 import { apiFetch, UnauthorizedError } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
+import { currencySymbol } from "../lib/currency";
 import { fmt } from "../lib/format";
 import { maskAmount, useColors, usePrefs } from "../lib/prefs";
 import { coffreColorsFor, fonts, type ThemeColors } from "../lib/theme";
+import { useCountUp } from "../lib/useCountUp";
 
 type CoffreItem = { nom: string; epargne: number; objectif: number; bloque: boolean; pct: number; rank: string; status: "done" | "warn" | "normal"; note?: string };
 
@@ -32,6 +34,7 @@ export default function CoffresScreen() {
   const [error, setError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const displayTotal = useCountUp(data?.overview.total ?? 0);
 
   const load = useCallback(async () => {
     try {
@@ -81,7 +84,7 @@ export default function CoffresScreen() {
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>Épargne totale</Text>
           <Text style={styles.heroValue}>
-            {maskAmount(fmt(data.overview.total), hideAmounts)} <Text style={styles.heroUnit}>F</Text>
+            {maskAmount(fmt(displayTotal), hideAmounts)} <Text style={styles.heroUnit}>{currencySymbol()}</Text>
           </Text>
           <View style={styles.heroStatsRow}>
             <View>
@@ -97,7 +100,7 @@ export default function CoffresScreen() {
 
         {data.coffres.map((c, i) => (
           <View key={c.nom} style={styles.coffreCard}>
-            <RingProgress pct={c.pct} color={coffreColors[i % coffreColors.length]} label={`${c.pct.toFixed(0)}%`} size={66} />
+            <RingProgress pct={c.pct} color={coffreColors[i % coffreColors.length]} size={66} />
             <View style={{ flex: 1 }}>
               <View style={styles.coffreHead}>
                 <Text style={styles.coffreNom} numberOfLines={1}>
@@ -107,9 +110,14 @@ export default function CoffresScreen() {
               </View>
               <Text style={styles.coffreVal}>
                 <Text style={{ fontWeight: "700" }}>{maskAmount(fmt(c.epargne), hideAmounts)}</Text>
-                <Text style={{ color: colors.muted2 }}> / {fmt(c.objectif)} F</Text>
+                <Text style={{ color: colors.muted2 }}>
+                  {" "}
+                  / {fmt(c.objectif)} {currencySymbol()}
+                </Text>
               </Text>
-              <Text style={styles.coffreReste}>Reste {maskAmount(fmt(Math.max(c.objectif - c.epargne, 0)), hideAmounts)} F</Text>
+              <Text style={styles.coffreReste}>
+                Reste {maskAmount(fmt(Math.max(c.objectif - c.epargne, 0)), hideAmounts)} {currencySymbol()}
+              </Text>
             </View>
           </View>
         ))}
@@ -120,7 +128,9 @@ export default function CoffresScreen() {
               <Text style={{ fontSize: 16 }}>⚠</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.detteAlertTitle}>{fmt(data.detteReste)} F à rembourser</Text>
+              <Text style={styles.detteAlertTitle}>
+                {fmt(data.detteReste)} {currencySymbol()} à rembourser
+              </Text>
               <Text style={styles.detteAlertSub}>Échéance la plus proche · {data.dettes.find((d) => !d.paid)?.echeance ?? "—"}</Text>
             </View>
           </View>

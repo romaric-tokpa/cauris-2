@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import Chip from "../components/Chip";
@@ -5,16 +6,19 @@ import { ChipScroller } from "../components/FormField";
 import OverlayScreen from "../components/OverlayScreen";
 import RingProgress from "../components/RingProgress";
 import SegmentedBar from "../components/SegmentedBar";
+import Sheet from "../components/Sheet";
+import Tap from "../components/Tap";
 import { apiFetch, UnauthorizedError } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
+import { currencySymbol } from "../lib/currency";
 import { fmt } from "../lib/format";
 import { useColors } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
+import { useCountUp } from "../lib/useCountUp";
 
 type Cat = { label: string; value: number };
 type PilotMonth = { id: string; label: string; isActive: boolean; revenu: number; depense: number; net: number; tauxPct: number; depCategories: Cat[]; revCategories: Cat[] };
 type PilotResponse = { months: PilotMonth[] };
-type DashboardResponse = { kpis: { fraisMois: number } };
 type CoffresResponse = { coffres: { nom: string; pct: number }[] };
 
 type AnnualMonth = { mm: string; monthName: string; label: string; hasData: boolean; revenu: number; depense: number; net: number; tauxPct: number; epargneFin: number };
@@ -25,6 +29,7 @@ type AnnualResponse = {
   months: AnnualMonth[];
   totals: { revenu: number; depense: number; net: number; tauxPct: number };
   epargne: { totale: number; debutAnnee: number; croissance: number; tauxPct: number };
+  bourse: { achatsAnnee: number; ventesAnnee: number; dividendesAnnee: number; valorisationActuelle: number; investiActuel: number; plusValueLatente: number; plusValuePct: number };
   depCategories: AnnualCat[];
   revCategories: AnnualCat[];
   bestMonth: AnnualMonth | null;
@@ -94,8 +99,9 @@ export default function AnalyseScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<"mois" | "annee">("mois");
+  const [selectedMonthId, setSelectedMonthId] = useState<string | null>(null);
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [pilot, setPilot] = useState<PilotResponse | null>(null);
-  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [coffres, setCoffres] = useState<CoffresResponse | null>(null);
   const [annual, setAnnual] = useState<AnnualResponse | null>(null);
   const [year, setYear] = useState<number | null>(null);
@@ -103,9 +109,8 @@ export default function AnalyseScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [pRes, dRes, cRes] = await Promise.all([apiFetch("/api/pilot"), apiFetch("/api/dashboard"), apiFetch("/api/coffres")]);
+      const [pRes, cRes] = await Promise.all([apiFetch("/api/pilot"), apiFetch("/api/coffres")]);
       setPilot(await pRes.json());
-      setDashboard(await dRes.json());
       setCoffres(await cRes.json());
       setError(null);
     } catch (e) {
@@ -151,7 +156,7 @@ export default function AnalyseScreen() {
       </OverlayScreen>
     );
   }
-  if (!pilot || !dashboard || !coffres) {
+  if (!pilot || !coffres) {
     return (
       <OverlayScreen title="Analyse">
         <ActivityIndicator color={colors.anthracite} style={{ marginTop: 40 }} />
@@ -159,7 +164,10 @@ export default function AnalyseScreen() {
     );
   }
 
-  const active = pilot.months.find((m) => m.isActive) ?? pilot.months[pilot.months.length - 1];
+  const monthsDesc = [...pilot.months].reverse();
+  const fallbackId = (pilot.months.find((m) => m.isActive) ?? pilot.months[pilot.months.length - 1])?.id;
+  const effectiveMonthId = selectedMonthId ?? fallbackId;
+  const active = pilot.months.find((m) => m.id === effectiveMonthId) ?? pilot.months[pilot.months.length - 1];
   const trend = pilot.months.slice(-4);
   const maxTrend = Math.max(...trend.map((m) => Math.abs(m.net)), 1);
   const urgence = coffres.coffres.find((c) => c.nom.toLowerCase().includes("urgence"));
@@ -167,10 +175,21 @@ export default function AnalyseScreen() {
   return (
     <OverlayScreen title="Analyse">
       <ScrollView contentContainerStyle={styles.content}>
-        <ChipScroller>
-          <Chip label="Ce mois" active={mode === "mois"} onPress={() => setMode("mois")} />
+        <View style={styles.modeRow}>
+          <Tap
+            style={[styles.modeDropdown, mode === "mois" && styles.modeDropdownActive]}
+            onPress={() => {
+              setMode("mois");
+              setMonthPickerOpen(true);
+            }}
+          >
+            <Text style={[styles.modeDropdownText, mode === "mois" && styles.modeDropdownTextActive]} numberOfLines={1}>
+              {effectiveMonthId === fallbackId ? "Ce mois" : (pilot.months.find((m) => m.id === effectiveMonthId)?.label ?? "Ce mois")}
+            </Text>
+            <Feather name="chevron-down" size={14} color={mode === "mois" ? "#fff" : colors.muted} />
+          </Tap>
           <Chip label="Bilan annuel" active={mode === "annee"} onPress={() => setMode("annee")} />
-        </ChipScroller>
+        </View>
 
         {mode === "mois" ? (
           <>
@@ -199,12 +218,14 @@ export default function AnalyseScreen() {
             <View style={styles.row}>
               <View style={styles.fraisCard}>
                 <Text style={styles.kpiLabel}>Frais du mois</Text>
-                <Text style={[styles.kpiVal, { fontSize: 19, color: colors.red }]}>{fmt(dashboard.kpis.fraisMois)} F</Text>
+                <Text style={[styles.kpiVal, { fontSize: 19, color: colors.red }]}>
+                  {fmt(active?.depCategories.find((c) => c.label === "Frais")?.value ?? 0)} {currencySymbol()}
+                </Text>
               </View>
               {urgence ? (
                 <View style={styles.urgenceCard}>
                   <Text style={styles.kpiLabel}>Fonds d&apos;urgence</Text>
-                  <RingProgress pct={urgence.pct} color={colors.orange} label={`${urgence.pct.toFixed(0)}%`} size={50} />
+                  <RingProgress pct={urgence.pct} color={colors.orange} size={50} />
                 </View>
               ) : null}
             </View>
@@ -222,11 +243,11 @@ export default function AnalyseScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Épargne nette · {trend.length} mois</Text>
               <View style={styles.trendRow}>
-                {trend.map((m, i) => (
-                  <View key={m.id} style={styles.trendCol}>
-                    <View style={[styles.trendBar, { height: Math.max((Math.abs(m.net) / maxTrend) * 74, 6), backgroundColor: i === trend.length - 1 ? colors.orange : colors.anthracite }]} />
+                {trend.map((m) => (
+                  <Tap key={m.id} style={styles.trendCol} onPress={() => setSelectedMonthId(m.id)}>
+                    <View style={[styles.trendBar, { height: Math.max((Math.abs(m.net) / maxTrend) * 74, 6), backgroundColor: m.id === effectiveMonthId ? colors.orange : colors.anthracite }]} />
                     <Text style={styles.trendLabel}>{m.label.slice(0, 4)}</Text>
-                  </View>
+                  </Tap>
                 ))}
               </View>
             </View>
@@ -237,6 +258,27 @@ export default function AnalyseScreen() {
           <AnnualView annual={annual} year={year} onSelectYear={selectYear} colors={colors} styles={styles} />
         )}
       </ScrollView>
+
+      <Sheet visible={monthPickerOpen} onClose={() => setMonthPickerOpen(false)} title="Choisir un mois">
+        {monthsDesc.map((m) => (
+          <Tap
+            key={m.id}
+            style={[styles.monthPickerRow, m.id === effectiveMonthId && styles.monthPickerRowActive]}
+            onPress={() => {
+              setSelectedMonthId(m.id);
+              setMonthPickerOpen(false);
+            }}
+          >
+            <Text style={styles.monthPickerLabel}>{m.label}</Text>
+            {m.isActive ? (
+              <View style={styles.monthPickerBadge}>
+                <Text style={styles.monthPickerBadgeText}>actif</Text>
+              </View>
+            ) : null}
+            {m.id === effectiveMonthId ? <Feather name="check" size={18} color={colors.orange} /> : null}
+          </Tap>
+        ))}
+      </Sheet>
     </OverlayScreen>
   );
 }
@@ -255,7 +297,7 @@ function AnnualView({
   styles: ReturnType<typeof createStyles>;
 }) {
   const maxMonth = Math.max(...annual.months.map((m) => m.epargneFin), 1);
-  const croissanceUp = annual.epargne.croissance >= 0;
+  const displayTotale = useCountUp(annual.epargne.totale);
 
   return (
     <>
@@ -270,13 +312,8 @@ function AnnualView({
       <View style={styles.hero}>
         <Text style={styles.heroLabel}>Épargne totale</Text>
         <Text style={styles.heroValue}>
-          {fmt(annual.epargne.totale)} <Text style={styles.heroUnit}>F</Text>
+          {fmt(displayTotale)} <Text style={styles.heroUnit}>{currencySymbol()}</Text>
         </Text>
-        <Text style={[styles.heroSub, { color: croissanceUp ? "#4ED88F" : "#FF9E7A" }]}>
-          {croissanceUp ? "+" : "−"}
-          {fmt(Math.abs(annual.epargne.croissance))} F depuis le début {annual.year}
-        </Text>
-        <Text style={styles.heroSub}>Coffres, épargne classique, épargne forcée, FleetOS — hors comptes courants et Bourse</Text>
       </View>
 
       <View style={styles.kpiGrid}>
@@ -303,14 +340,18 @@ function AnnualView({
           {annual.bestMonth ? (
             <View style={styles.miniCard}>
               <Text style={styles.kpiLabel}>Meilleur mois (flux)</Text>
-              <Text style={[styles.kpiVal, { fontSize: 15, color: colors.green }]}>{fmt(annual.bestMonth.net)} F</Text>
+              <Text style={[styles.kpiVal, { fontSize: 15, color: colors.green }]}>
+                {fmt(annual.bestMonth.net)} {currencySymbol()}
+              </Text>
               <Text style={styles.miniCardSub}>{annual.bestMonth.label}</Text>
             </View>
           ) : null}
           {annual.worstMonth ? (
             <View style={styles.miniCard}>
               <Text style={styles.kpiLabel}>Mois le plus difficile</Text>
-              <Text style={[styles.kpiVal, { fontSize: 15, color: colors.red }]}>{fmt(annual.worstMonth.net)} F</Text>
+              <Text style={[styles.kpiVal, { fontSize: 15, color: colors.red }]}>
+                {fmt(annual.worstMonth.net)} {currencySymbol()}
+              </Text>
               <Text style={styles.miniCardSub}>{annual.worstMonth.label}</Text>
             </View>
           ) : null}
@@ -341,6 +382,40 @@ function AnnualView({
         <Text style={styles.cardTitle}>Revenus par source · cumul {annual.year}</Text>
         <AnnualBars items={annual.revCategories} color={colors.green} styles={styles} />
       </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Bourse (BRVM) · {annual.year}</Text>
+        <View style={styles.kpiGrid}>
+          <View style={styles.kpi}>
+            <Text style={styles.kpiLabel}>Investi cette année</Text>
+            <Text style={[styles.kpiVal, { color: colors.violet }]}>{fmt(annual.bourse.achatsAnnee)}</Text>
+          </View>
+          <View style={styles.kpi}>
+            <Text style={styles.kpiLabel}>Vendu cette année</Text>
+            <Text style={styles.kpiVal}>{fmt(annual.bourse.ventesAnnee)}</Text>
+          </View>
+          <View style={styles.kpi}>
+            <Text style={styles.kpiLabel}>Dividendes reçus</Text>
+            <Text style={[styles.kpiVal, { color: colors.green }]}>{fmt(annual.bourse.dividendesAnnee)}</Text>
+          </View>
+          <View style={styles.kpi}>
+            <Text style={styles.kpiLabel}>Plus-value latente</Text>
+            <Text style={[styles.kpiVal, { color: annual.bourse.plusValueLatente >= 0 ? colors.green : colors.red }]}>
+              {annual.bourse.plusValueLatente >= 0 ? "+" : "−"}
+              {annual.bourse.plusValuePct.toFixed(1)}%
+            </Text>
+          </View>
+        </View>
+        <View style={styles.divBourse}>
+          <Text style={styles.kpiLabel}>Portefeuille aujourd&apos;hui</Text>
+          <Text style={styles.kpiVal}>
+            {fmt(annual.bourse.valorisationActuelle)} {currencySymbol()}{" "}
+            <Text style={styles.miniCardSub}>
+              · investi {fmt(annual.bourse.investiActuel)} {currencySymbol()}
+            </Text>
+          </Text>
+        </View>
+      </View>
     </>
   );
 }
@@ -349,6 +424,27 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     errorText: { fontFamily: fonts.sans, color: colors.ink, padding: 20 },
     content: { paddingHorizontal: 18, paddingBottom: 32, gap: 14 },
+    modeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    modeDropdown: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 999,
+      backgroundColor: colors.paper,
+      borderWidth: 1,
+      borderColor: colors.line,
+      maxWidth: 190,
+    },
+    modeDropdownActive: { backgroundColor: colors.anthracite, borderColor: colors.anthracite },
+    modeDropdownText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.ink, flexShrink: 1 },
+    modeDropdownTextActive: { color: "#fff" },
+    monthPickerRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 12 },
+    monthPickerRowActive: { backgroundColor: colors.fillSoft },
+    monthPickerLabel: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
+    monthPickerBadge: { backgroundColor: colors.activePill, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+    monthPickerBadgeText: { fontFamily: fonts.sansSemiBold, fontSize: 10.5, color: colors.orange },
     kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
     kpi: { flexBasis: "48%", flexGrow: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 14 },
     kpiLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2, marginBottom: 6 },
@@ -378,5 +474,6 @@ function createStyles(colors: ThemeColors) {
     yearCol: { flex: 1, alignItems: "center", gap: 5, justifyContent: "flex-end" },
     yearBar: { width: "100%", borderRadius: 5 },
     yearLabel: { fontFamily: fonts.sans, fontSize: 9.5, color: colors.muted2 },
+    divBourse: { marginTop: 14, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.lineSoft },
   });
 }

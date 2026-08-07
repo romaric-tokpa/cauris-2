@@ -6,15 +6,22 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import OverlayScreen from "../components/OverlayScreen";
 import PasswordSheet from "../components/PasswordSheet";
 import SwitchToggle from "../components/Switch";
+import type { Currency } from "../lib/currency";
 import { useAuth } from "../lib/AuthContext";
 import { useColors, usePrefs } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
 
 const APP_VERSION = "2.0";
 
+const CURRENCIES: { value: Currency; label: string }[] = [
+  { value: "XOF", label: "FCFA" },
+  { value: "EUR", label: "EUR" },
+  { value: "USD", label: "USD" },
+];
+
 export default function ReglagesScreen() {
   const { logout } = useAuth();
-  const { dark, toggleDark, hideAmounts, toggleHideAmounts, biometric, toggleBiometric } = usePrefs();
+  const { dark, toggleDark, hideAmounts, toggleHideAmounts, biometric, toggleBiometric, currency, setCurrency } = usePrefs();
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -64,7 +71,13 @@ export default function ReglagesScreen() {
             </View>
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Devise</Text>
-              <Text style={styles.rowValue}>FCFA</Text>
+              <View style={styles.currencyGroup}>
+                {CURRENCIES.map((c) => (
+                  <Pressable key={c.value} style={[styles.currencyPill, currency === c.value && styles.currencyPillActive]} onPress={() => setCurrency(c.value)}>
+                    <Text style={[styles.currencyPillText, currency === c.value && styles.currencyPillTextActive]}>{c.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
             <Pressable style={[styles.row, styles.rowLast]} onPress={() => router.push("/sauvegardes")}>
               <Text style={styles.rowLabel}>Sauvegardes & restauration</Text>
@@ -97,8 +110,12 @@ function createStyles(colors: ThemeColors) {
     row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },
     rowLast: { borderBottomWidth: 0 },
     rowLabel: { fontFamily: fonts.sans, fontSize: 15, color: colors.ink },
-    rowValue: { fontFamily: fonts.monoBold, fontSize: 14, color: colors.muted },
     rowValueMono: { fontFamily: fonts.mono, fontSize: 13, color: colors.muted2 },
+    currencyGroup: { flexDirection: "row", gap: 6 },
+    currencyPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.fillSoft },
+    currencyPillActive: { backgroundColor: colors.anthracite },
+    currencyPillText: { fontFamily: fonts.sansSemiBold, fontSize: 11.5, color: colors.muted },
+    currencyPillTextActive: { color: "#fff" },
     logoutText: { fontFamily: fonts.sansSemiBold, color: colors.red },
   });
 }
