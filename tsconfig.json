@@ -36,7 +36,8 @@
   ],
   "exclude": [
     "node_modules",
-    "_design"
+    "_design",
+    "mobile"
   ],
   "extends": "expo/tsconfig.base"
 }
