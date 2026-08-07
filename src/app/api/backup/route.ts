@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getSession, USER_ID } from "@/lib/auth";
 import { createBackup } from "@/lib/db";
@@ -9,7 +10,11 @@ export const maxDuration = 30;
 function isAuthorizedCron(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  const header = req.headers.get("authorization") ?? "";
+  const expected = `Bearer ${secret}`;
+  const a = Buffer.from(header);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**

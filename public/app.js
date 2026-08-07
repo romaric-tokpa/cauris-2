@@ -1720,14 +1720,20 @@
     renderPret();
     toast('Opération retirée');
   }
+  /* « reste » à l'échéance N suppose que 2..N sont TOUTES payées (table
+     cumulative de la banque) : on ne peut se fier qu'à la plus longue série
+     contiguë payée depuis le début, jamais juste à la dernière par numéro
+     (une échéance future marquée payée manuellement peut créer un trou). */
   function pretSummary(){
-    const payees=PRET_ECHEANCES.filter(pretIsPaid);
-    const last=payees[payees.length-1]||null;
-    const next=PRET_ECHEANCES.find(e=>!pretIsPaid(e))||null;
+    const links=pretAllLinks();
+    const paidNos=new Set(PRET_ECHEANCES.filter(e=>links[e.no]||pretIsPaid(e)).map(e=>e.no));
+    let last=null, payeesCount=0;
+    for(const e of PRET_ECHEANCES){ if(!paidNos.has(e.no)) break; last=e; payeesCount++; }
+    const next=PRET_ECHEANCES.find(e=>!paidNos.has(e.no))||null;
     const resteDu=last?last.reste:PRET_INFO.montant;
     const rembourse=PRET_INFO.montant-resteDu;
     const pct=PRET_INFO.montant>0? rembourse/PRET_INFO.montant*100 : 0;
-    return { last, next, resteDu, rembourse, pct, payees:payees.length, restantes:PRET_ECHEANCES.length-payees.length };
+    return { last, next, resteDu, rembourse, pct, payees:payeesCount, restantes:PRET_ECHEANCES.length-payeesCount };
   }
   function injectPretTab(){
     const tabs=document.querySelector('.topbar .tabs');

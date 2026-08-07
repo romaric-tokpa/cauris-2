@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { changePassword, getSession } from "@/lib/auth";
+import { changePassword, getSession, LoginLockedError } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,14 @@ export async function POST(req: Request) {
   const oldPassword = typeof body.oldPassword === "string" ? body.oldPassword : "";
   const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
 
-  const result = await changePassword(oldPassword, newPassword);
-  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-  return NextResponse.json({ ok: true });
+  try {
+    const result = await changePassword(oldPassword, newPassword);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    if (e instanceof LoginLockedError) {
+      return NextResponse.json({ error: "locked", message: e.message }, { status: 429, headers: { "Retry-After": String(e.retryAfterSeconds) } });
+    }
+    throw e;
+  }
 }

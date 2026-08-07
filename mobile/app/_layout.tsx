@@ -4,8 +4,10 @@ import { SpaceMono_400Regular, SpaceMono_700Bold } from "@expo-google-fonts/spac
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import BiometricGate from "../components/BiometricGate";
 import { AuthProvider, useAuth } from "../lib/AuthContext";
 import { PrefsProvider, useColors, usePrefs } from "../lib/prefs";
 import { ProfileProvider } from "../lib/ProfileContext";
@@ -13,15 +15,24 @@ import { colors as staticColors } from "../lib/theme";
 
 function RootNavigator() {
   const { isLoggedIn, loading } = useAuth();
-  const { dark } = usePrefs();
+  const { dark, biometric, loaded: prefsLoaded } = usePrefs();
   const colors = useColors();
+  const [unlocked, setUnlocked] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    if (!isLoggedIn) setUnlocked(false);
+  }, [isLoggedIn]);
+
+  if (loading || !prefsLoaded) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.desk }}>
         <ActivityIndicator color={colors.anthracite} />
       </View>
     );
+  }
+
+  if (isLoggedIn && biometric && !unlocked) {
+    return <BiometricGate colors={colors} onUnlock={() => setUnlocked(true)} />;
   }
 
   return (

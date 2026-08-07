@@ -134,14 +134,26 @@ export type PretSummary = {
   restantes: number;
 };
 
+/**
+ * `reste` (capital restant dû) à l'échéance N suppose que 2..N ont TOUTES été
+ * payées (table d'amortissement cumulative de la banque) — on ne peut donc se
+ * fier qu'à la plus longue série contiguë payée depuis le début, jamais à la
+ * dernière échéance payée par numéro (qui peut être hors ordre si une
+ * échéance future est marquée payée manuellement avant les précédentes).
+ */
 function computeSummary(paidNos: Set<number>): PretSummary {
-  const payees = PRET_ECHEANCES.filter((e) => paidNos.has(e.no));
-  const last = payees[payees.length - 1] ?? null;
+  let last: PretEcheance | null = null;
+  let payeesCount = 0;
+  for (const e of PRET_ECHEANCES) {
+    if (!paidNos.has(e.no)) break;
+    last = e;
+    payeesCount += 1;
+  }
   const next = PRET_ECHEANCES.find((e) => !paidNos.has(e.no)) ?? null;
   const resteDu = last ? last.reste : PRET_INFO.montant;
   const rembourse = PRET_INFO.montant - resteDu;
   const pct = PRET_INFO.montant > 0 ? (rembourse / PRET_INFO.montant) * 100 : 0;
-  return { next, resteDu: round(resteDu), rembourse: round(rembourse), pct: Math.round(pct * 10) / 10, payees: payees.length, restantes: PRET_ECHEANCES.length - payees.length };
+  return { next, resteDu: round(resteDu), rembourse: round(rembourse), pct: Math.round(pct * 10) / 10, payees: payeesCount, restantes: PRET_ECHEANCES.length - payeesCount };
 }
 
 export type PretResponse = {

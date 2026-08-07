@@ -112,16 +112,35 @@ export function resolveCycleContext(seed: SeedData, state: Record<string, unknow
   const coffreOverrides = bucket.coffreOverrides ?? {};
   const globalPlacements = cycles.placements ?? [];
 
+  /*
+   * `customComptes`/`customCoffres` ne portent que le solde INITIAL d'un
+   * compte/coffre créé après coup (voir createAccount()/createCoffre()) : dès
+   * qu'un cycle se clôture, son solde vécu est reporté comme n'importe quel
+   * autre compte dans `opening.comptes`/`opening.coffres` du nouveau mois —
+   * qui doit alors prévaloir. `custom` passe donc EN PREMIER dans le concat :
+   * liveComptes()/liveCoffres() indexent par nom et gardent la DERNIÈRE
+   * entrée rencontrée, donc l'entrée de mois (plus fraîche) écrase la
+   * référence "custom" si les deux existent — sinon le solde repartait à sa
+   * valeur de création à chaque clôture, quels que soient les mouvements
+   * réels de la période.
+   */
   function baseComptes(): Compte[] {
     const monthComptes = (M.seed ? seed.comptes : M.opening?.comptes ?? []).filter((c) => c.type !== "placement").map((c) => ({ ...c }));
     const placements = globalPlacements.map((c) => ({ ...c, solde: positionsValue(c) }));
     const custom = (cycles.customComptes ?? []).map((c) => ({ ...c }));
-    return monthComptes.concat(placements, custom);
+    // dédoublonne par nom (custom en premier, monthComptes l'emporte en cas de collision) : les consommateurs directs
+    // de baseComptes() (ex. liste de comptes d'operations.ts) n'ont pas de dédup à eux, contrairement à liveComptes().
+    const map = new Map<string, Compte>();
+    custom.concat(monthComptes, placements).forEach((c) => map.set(c.nom, c));
+    return Array.from(map.values());
   }
   function baseCoffres(): Coffre[] {
     const seeded = (M.seed ? seed.coffres : M.opening?.coffres ?? []).map((c) => ({ ...c }));
     const custom = (cycles.customCoffres ?? []).map((c) => ({ ...c }));
-    return seeded.concat(custom);
+    // dédoublonne par nom (custom en premier, seeded l'emporte en cas de collision) — voir liveCoffres(), qui ne fait qu'un .map() sans dédup.
+    const map = new Map<string, Coffre>();
+    custom.concat(seeded).forEach((c) => map.set(c.nom, c));
+    return Array.from(map.values());
   }
   function archivedOpsRaw(): Operation[] {
     return M.seed ? seed.operations : M.archive ?? [];

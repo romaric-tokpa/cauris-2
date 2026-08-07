@@ -11,6 +11,14 @@ import { maskAmount, useColors, usePrefs } from "../lib/prefs";
 import { coffreColorsFor, fonts, type ThemeColors } from "../lib/theme";
 
 type CoffreItem = { nom: string; epargne: number; objectif: number; bloque: boolean; pct: number; rank: string; status: "done" | "warn" | "normal"; note?: string };
+
+/** Couleur du badge de rang : done > bloque > warn (⚠ explicite) > normal (neutre, pas une alerte). */
+function coffreBadgeColors(c: CoffreItem, colors: ThemeColors): { color: string; backgroundColor: string } {
+  if (c.status === "done") return { color: colors.green, backgroundColor: colors.greenBg };
+  if (c.bloque) return { color: colors.blue, backgroundColor: colors.blueBg };
+  if (c.status === "warn") return { color: colors.amber, backgroundColor: colors.amberBg };
+  return { color: colors.acier, backgroundColor: colors.fillSoft };
+}
 type DetteItem = { id: string; nom: string; montant: number; retrait?: string; echeance?: string; paid: boolean; source: "seed" | "manuel" | "auto" };
 type CoffresResponse = { overview: { total: number; accessible: number; bloquee: number }; coffres: CoffreItem[]; detteReste: number; dettes: DetteItem[]; dettesNote?: string };
 
@@ -95,14 +103,7 @@ export default function CoffresScreen() {
                 <Text style={styles.coffreNom} numberOfLines={1}>
                   {c.nom}
                 </Text>
-                <Text
-                  style={[
-                    styles.coffreRank,
-                    { color: c.status === "done" ? colors.green : c.bloque ? colors.blue : colors.orange, backgroundColor: c.status === "done" ? colors.greenBg : c.bloque ? colors.blueBg : colors.redBg },
-                  ]}
-                >
-                  {c.rank}
-                </Text>
+                <Text style={[styles.coffreRank, coffreBadgeColors(c, colors)]}>{c.rank}</Text>
               </View>
               <Text style={styles.coffreVal}>
                 <Text style={{ fontWeight: "700" }}>{maskAmount(fmt(c.epargne), hideAmounts)}</Text>

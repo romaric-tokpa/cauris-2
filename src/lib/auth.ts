@@ -17,6 +17,40 @@ import { getMetaValue, setMetaValue } from "./db";
 const scryptAsync = promisify(scrypt) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
 const PASSWORD_META_KEY = "password_hash";
 
+/**
+ * Anti-brute-force sur le mot de passe : seul verrou d'accès à l'app,
+ * désormais joignable publiquement (cauris-five.vercel.app). Compteur
+ * persisté en base (meta), donc valable même sur des invocations serverless
+ * distinctes. Mono-utilisateur : pas besoin de distinguer par IP.
+ */
+const LOGIN_LOCKOUT_META_KEY = "login_lockout";
+const MAX_ATTEMPTS = 8;
+const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const LOCKOUT_MS = 15 * 60 * 1000;
+
+type LockoutState = { count: number; windowStart: number; lockedUntil: number };
+
+export class LoginLockedError extends Error {
+  constructor(public retryAfterSeconds: number) {
+    super(`Trop de tentatives. Réessaie dans ${Math.ceil(retryAfterSeconds / 60)} min.`);
+  }
+}
+
+async function readLockoutState(): Promise<LockoutState> {
+  const raw = await getMetaValue(LOGIN_LOCKOUT_META_KEY);
+  if (!raw) return { count: 0, windowStart: Date.now(), lockedUntil: 0 };
+  try {
+    const parsed = JSON.parse(raw) as Partial<LockoutState>;
+    return { count: parsed.count ?? 0, windowStart: parsed.windowStart ?? Date.now(), lockedUntil: parsed.lockedUntil ?? 0 };
+  } catch {
+    return { count: 0, windowStart: Date.now(), lockedUntil: 0 };
+  }
+}
+
+async function writeLockoutState(state: LockoutState): Promise<void> {
+  await setMetaValue(LOGIN_LOCKOUT_META_KEY, JSON.stringify(state));
+}
+
 async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
   const derived = await scryptAsync(password, salt, 64);
@@ -68,7 +102,7 @@ function verifyToken(token: string | undefined): { userId: string } | null {
   return { userId };
 }
 
-export async function checkPassword(input: string): Promise<boolean> {
+async function verifyPasswordOnly(input: string): Promise<boolean> {
   const storedHash = await getMetaValue(PASSWORD_META_KEY);
   if (storedHash) return verifyHashedPassword(input, storedHash);
 
@@ -78,6 +112,33 @@ export async function checkPassword(input: string): Promise<boolean> {
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+/** Vérifie le mot de passe avec verrouillage progressif après plusieurs échecs. Lève LoginLockedError si verrouillé. */
+export async function checkPassword(input: string): Promise<boolean> {
+  const now = Date.now();
+  let state = await readLockoutState();
+
+  if (state.lockedUntil > now) {
+    throw new LoginLockedError(Math.ceil((state.lockedUntil - now) / 1000));
+  }
+  if (now - state.windowStart > ATTEMPT_WINDOW_MS) {
+    state = { count: 0, windowStart: now, lockedUntil: 0 };
+  }
+
+  const ok = await verifyPasswordOnly(input);
+
+  if (ok) {
+    await writeLockoutState({ count: 0, windowStart: now, lockedUntil: 0 });
+    return true;
+  }
+
+  state.count += 1;
+  if (state.count >= MAX_ATTEMPTS) {
+    state.lockedUntil = now + LOCKOUT_MS;
+  }
+  await writeLockoutState(state);
+  return false;
 }
 
 /** Change le mot de passe partagé (web + mobile) : vérifie l'ancien, hash le nouveau dans meta. */

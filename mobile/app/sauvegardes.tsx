@@ -70,9 +70,14 @@ export default function SauvegardesScreen() {
     setSaving(true);
     try {
       const res = await apiFetch("/api/backup", { method: "POST" });
-      if (res.ok) await load();
+      if (res.ok) {
+        await load();
+      } else {
+        Alert.alert("Échec de la sauvegarde", "La sauvegarde n'a pas pu être créée. Réessaie dans un instant.");
+      }
     } catch (e) {
-      if (e instanceof UnauthorizedError) logout();
+      if (e instanceof UnauthorizedError) return logout();
+      Alert.alert("Échec de la sauvegarde", "La sauvegarde n'a pas pu être créée. Réessaie dans un instant.");
     } finally {
       setSaving(false);
     }
@@ -92,9 +97,12 @@ export default function SauvegardesScreen() {
       if (res.ok) {
         await load();
         Alert.alert("Restauration effectuée", "Les données ont été restaurées.");
+      } else {
+        Alert.alert("Échec de la restauration", "Les données n'ont pas pu être restaurées. Réessaie dans un instant.");
       }
     } catch (e) {
-      if (e instanceof UnauthorizedError) logout();
+      if (e instanceof UnauthorizedError) return logout();
+      Alert.alert("Échec de la restauration", "Les données n'ont pas pu être restaurées. Réessaie dans un instant.");
     } finally {
       setRestoringId(null);
     }

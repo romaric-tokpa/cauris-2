@@ -52,11 +52,18 @@ export default function BudgetSheet({ visible, onClose, onSaved, onUnauthorized,
   async function handleDelete() {
     if (!editing) return;
     setSaving(true);
+    setError(null);
     try {
       const res = await apiFetch(`/api/budget?cat=${encodeURIComponent(editing.cat)}`, { method: "DELETE" });
-      if (res.ok) onSaved();
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        setError(b.error || "Échec de la suppression.");
+        return;
+      }
+      onSaved();
     } catch (e) {
-      if (e instanceof UnauthorizedError) onUnauthorized();
+      if (e instanceof UnauthorizedError) return onUnauthorized();
+      setError("Échec de la suppression.");
     } finally {
       setSaving(false);
     }
