@@ -86,7 +86,7 @@ export type AnnualResponse = {
   availableYears: number[];
   months: AnnualMonth[];
   totals: { revenu: number; depense: number; net: number; tauxPct: number };
-  epargne: { totale: number; debutAnnee: number; croissance: number };
+  epargne: { totale: number; debutAnnee: number; croissance: number; tauxPct: number };
   depCategories: AnnualCategory[];
   revCategories: AnnualCategory[];
   bestMonth: AnnualMonth | null;
@@ -197,6 +197,8 @@ export function computeAnnualAnalysis(seed: SeedData, state: Record<string, unkn
       totale: round(epargneTotale),
       debutAnnee: round(epargneDebutAnnee ?? 0),
       croissance: round(epargneTotale - (epargneDebutAnnee ?? 0)),
+      // Part des revenus de l'année réellement mise de côté sur les comptes d'épargne — pas revenu-dépense (voir epargneCroissance).
+      tauxPct: totalRevenu > 0 ? Math.round(((epargneTotale - (epargneDebutAnnee ?? 0)) / totalRevenu) * 1000) / 10 : 0,
     },
     depCategories: toAnnualCategories(depCatTotals),
     revCategories: toAnnualCategories(revCatTotals),

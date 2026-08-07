@@ -24,7 +24,7 @@ type AnnualResponse = {
   availableYears: number[];
   months: AnnualMonth[];
   totals: { revenu: number; depense: number; net: number; tauxPct: number };
-  epargne: { totale: number; debutAnnee: number; croissance: number };
+  epargne: { totale: number; debutAnnee: number; croissance: number; tauxPct: number };
   depCategories: AnnualCat[];
   revCategories: AnnualCat[];
   bestMonth: AnnualMonth | null;
@@ -293,8 +293,8 @@ function AnnualView({
           <Text style={styles.kpiVal}>{annual.monthsWithData} / 12</Text>
         </View>
         <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Flux net (revenus − dépenses)</Text>
-          <Text style={[styles.kpiVal, { color: annual.totals.net >= 0 ? colors.green : colors.red }]}>{fmt(annual.totals.net)}</Text>
+          <Text style={styles.kpiLabel}>Taux d&apos;épargne</Text>
+          <Text style={[styles.kpiVal, { color: annual.epargne.tauxPct >= 0 ? colors.green : colors.red }]}>{annual.epargne.tauxPct}%</Text>
         </View>
       </View>
 
