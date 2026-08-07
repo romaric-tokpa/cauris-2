@@ -5,7 +5,7 @@ import { checkPassword, createSession } from "@/lib/auth";
 
 export async function login(_prev: { error?: string } | undefined, formData: FormData) {
   const password = String(formData.get("password") ?? "");
-  if (!checkPassword(password)) {
+  if (!(await checkPassword(password))) {
     return { error: "Mot de passe incorrect." };
   }
   await createSession();

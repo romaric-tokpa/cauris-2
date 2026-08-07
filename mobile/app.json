@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "MaCaisse",
+    "slug": "cauris",
+    "version": "1.0.0",
+    "scheme": "macaisse",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cauris.macaisse"
+    },
+    "android": {
+      "package": "com.cauris.macaisse",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-router",
+      "expo-font",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cauris a besoin d'accéder à vos photos pour changer votre photo de profil."
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d2a4d283-de37-451e-84ac-8717704a47a8"
+      }
+    },
+    "owner": "tokpa"
+  }
+}

@@ -1,12 +1,37 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+import { cookies, headers } from "next/headers";
+import { getMetaValue, setMetaValue } from "./db";
 
 /**
  * Authentification minimale, mono-utilisateur.
- * Le mot de passe (APP_PASSWORD) déverrouille l'app ; la session est un cookie
- * signé HMAC-SHA256 avec SESSION_SECRET. Aucune dépendance externe.
+ * Le mot de passe déverrouille l'app ; la session est un cookie signé
+ * HMAC-SHA256 avec SESSION_SECRET. Aucune dépendance externe.
+ *
+ * Le mot de passe lui-même vient soit d'un hash stocké dans la table meta
+ * (changé depuis l'app, cf. changePassword ci-dessous), soit — tant qu'aucun
+ * changement n'a eu lieu — de la variable d'env APP_PASSWORD.
  */
+
+const scryptAsync = promisify(scrypt) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
+const PASSWORD_META_KEY = "password_hash";
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  const derived = await scryptAsync(password, salt, 64);
+  return `${salt.toString("hex")}:${derived.toString("hex")}`;
+}
+
+async function verifyHashedPassword(password: string, stored: string): Promise<boolean> {
+  const [saltHex, hashHex] = stored.split(":");
+  if (!saltHex || !hashHex) return false;
+  const salt = Buffer.from(saltHex, "hex");
+  const expected = Buffer.from(hashHex, "hex");
+  const derived = await scryptAsync(password, salt, expected.length);
+  if (derived.length !== expected.length) return false;
+  return timingSafeEqual(derived, expected);
+}
 
 const COOKIE = "cauris_session";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 jours
@@ -43,13 +68,25 @@ function verifyToken(token: string | undefined): { userId: string } | null {
   return { userId };
 }
 
-export function checkPassword(input: string): boolean {
+export async function checkPassword(input: string): Promise<boolean> {
+  const storedHash = await getMetaValue(PASSWORD_META_KEY);
+  if (storedHash) return verifyHashedPassword(input, storedHash);
+
   const expected = process.env.APP_PASSWORD ?? "";
   if (!expected) throw new Error("APP_PASSWORD non configuré.");
   const a = Buffer.from(input);
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+/** Change le mot de passe partagé (web + mobile) : vérifie l'ancien, hash le nouveau dans meta. */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await checkPassword(oldPassword))) return { ok: false, error: "invalid_password" };
+  if (!newPassword || newPassword.length < 8) return { ok: false, error: "weak_password" };
+  const hash = await hashPassword(newPassword);
+  await setMetaValue(PASSWORD_META_KEY, hash);
+  return { ok: true };
 }
 
 export async function createSession(): Promise<void> {
@@ -68,8 +105,19 @@ export async function destroySession(): Promise<void> {
   jar.delete(COOKIE);
 }
 
-/** Renvoie l'userId si la session est valide, sinon null. */
+/** Jeton bearer pour les clients sans cookie (app mobile) : même format que le cookie web. */
+export function createBearerToken(): string {
+  return makeToken(USER_ID);
+}
+
+/** Renvoie l'userId si la session est valide (cookie web ou en-tête Authorization: Bearer), sinon null. */
 export async function getSession(): Promise<{ userId: string } | null> {
+  const h = await headers();
+  const auth = h.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    const fromHeader = verifyToken(auth.slice(7).trim());
+    if (fromHeader) return fromHeader;
+  }
   const jar = await cookies();
   return verifyToken(jar.get(COOKIE)?.value);
 }

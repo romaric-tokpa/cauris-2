@@ -84,28 +84,71 @@ export async function getDb(): Promise<Client> {
   return _client;
 }
 
-/** Renvoie les données seed (cycle d'origine) depuis Turso, avec repli sur la constante. */
+let _seedCache: unknown | null = null;
+
+/**
+ * Renvoie les données seed (cycle d'origine) depuis Turso, avec repli sur la
+ * constante. Mémoïsé en mémoire pour le process : le seed n'est réécrit que
+ * lors d'un bump de SEED_VERSION dans ensureSchema() (donc au redémarrage),
+ * jamais en cours de route — cet aller-retour réseau était refait à chaque
+ * appel API alors qu'il ne change jamais entre deux requêtes.
+ */
 export async function getSeed(): Promise<unknown> {
+  if (_seedCache !== null) return _seedCache;
   const db = await getDb();
   const r = await db.execute({ sql: "SELECT value FROM meta WHERE key = 'seed'", args: [] });
   const raw = r.rows[0]?.value;
+  let seed: unknown = SEED;
   if (typeof raw === "string") {
     try {
-      return JSON.parse(raw);
+      seed = JSON.parse(raw);
     } catch {
       /* ignore, use constant */
     }
   }
-  return SEED;
+  _seedCache = seed;
+  return seed;
+}
+
+/** Lit une valeur générique de la table meta (ex. le hash du mot de passe). */
+export async function getMetaValue(key: string): Promise<string | null> {
+  const db = await getDb();
+  const r = await db.execute({ sql: "SELECT value FROM meta WHERE key = ?", args: [key] });
+  return r.rows[0] ? String(r.rows[0].value) : null;
+}
+
+/** Écrit (upsert) une valeur générique dans la table meta. */
+export async function setMetaValue(key: string, value: string): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    args: [key, value],
+  });
 }
 
 export type StateRow = { key: string; value: string; updated_at: number };
 
-/** Toutes les entrées d'état (cycles + buckets mensuels) d'un utilisateur. */
+/** Une seule entrée d'état, sans charger tout le reste (ex. photo de profil). */
+export async function getState(userId: string, key: string): Promise<string | null> {
+  const db = await getDb();
+  const r = await db.execute({
+    sql: "SELECT value FROM state WHERE user_id = ? AND key = ?",
+    args: [userId, key],
+  });
+  const row = r.rows[0];
+  return row ? String(row.value) : null;
+}
+
+/**
+ * Toutes les entrées d'état (cycles + buckets mensuels) d'un utilisateur —
+ * exclut volontairement "profile" (photo en data URI, dizaines de Ko) que
+ * la logique cycles/buckets n'utilise jamais : la charger ici alourdirait
+ * chaque appel API pour rien. La photo se lit via getState() dédié.
+ */
 export async function getAllState(userId: string): Promise<StateRow[]> {
   const db = await getDb();
   const r = await db.execute({
-    sql: "SELECT key, value, updated_at FROM state WHERE user_id = ?",
+    sql: "SELECT key, value, updated_at FROM state WHERE user_id = ? AND key != 'profile'",
     args: [userId],
   });
   return r.rows.map((row) => ({
