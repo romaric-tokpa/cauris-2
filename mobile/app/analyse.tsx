@@ -17,13 +17,14 @@ type PilotResponse = { months: PilotMonth[] };
 type DashboardResponse = { kpis: { fraisMois: number } };
 type CoffresResponse = { coffres: { nom: string; pct: number }[] };
 
-type AnnualMonth = { mm: string; monthName: string; label: string; hasData: boolean; revenu: number; depense: number; net: number; tauxPct: number };
+type AnnualMonth = { mm: string; monthName: string; label: string; hasData: boolean; revenu: number; depense: number; net: number; tauxPct: number; epargneFin: number };
 type AnnualCat = { label: string; value: number; pct: number };
 type AnnualResponse = {
   year: number;
   availableYears: number[];
   months: AnnualMonth[];
   totals: { revenu: number; depense: number; net: number; tauxPct: number };
+  epargne: { totale: number; debutAnnee: number; croissance: number };
   depCategories: AnnualCat[];
   revCategories: AnnualCat[];
   bestMonth: AnnualMonth | null;
@@ -253,8 +254,8 @@ function AnnualView({
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const maxMonth = Math.max(...annual.months.map((m) => Math.abs(m.net)), 1);
-  const up = annual.totals.net >= 0;
+  const maxMonth = Math.max(...annual.months.map((m) => m.epargneFin), 1);
+  const croissanceUp = annual.epargne.croissance >= 0;
 
   return (
     <>
@@ -267,14 +268,15 @@ function AnnualView({
       ) : null}
 
       <View style={styles.hero}>
-        <Text style={styles.heroLabel}>Épargne nette · {annual.year}</Text>
-        <Text style={[styles.heroValue, { color: up ? colors.green : colors.red }]}>
-          {up ? "+" : "−"}
-          {fmt(Math.abs(annual.totals.net))} <Text style={styles.heroUnit}>F</Text>
+        <Text style={styles.heroLabel}>Épargne totale</Text>
+        <Text style={styles.heroValue}>
+          {fmt(annual.epargne.totale)} <Text style={styles.heroUnit}>F</Text>
         </Text>
-        <Text style={styles.heroSub}>
-          {fmt(annual.totals.revenu)} F de revenus · {fmt(annual.totals.depense)} F de dépenses · {annual.totals.tauxPct}% de taux d&apos;épargne
+        <Text style={[styles.heroSub, { color: croissanceUp ? "#4ED88F" : "#FF9E7A" }]}>
+          {croissanceUp ? "+" : "−"}
+          {fmt(Math.abs(annual.epargne.croissance))} F depuis le début {annual.year}
         </Text>
+        <Text style={styles.heroSub}>Coffres, épargne classique, épargne forcée, FleetOS — hors comptes courants et Bourse</Text>
       </View>
 
       <View style={styles.kpiGrid}>
@@ -291,8 +293,8 @@ function AnnualView({
           <Text style={styles.kpiVal}>{annual.monthsWithData} / 12</Text>
         </View>
         <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Taux d&apos;épargne moyen</Text>
-          <Text style={[styles.kpiVal, { color: colors.green }]}>{annual.totals.tauxPct}%</Text>
+          <Text style={styles.kpiLabel}>Flux net (revenus − dépenses)</Text>
+          <Text style={[styles.kpiVal, { color: annual.totals.net >= 0 ? colors.green : colors.red }]}>{fmt(annual.totals.net)}</Text>
         </View>
       </View>
 
@@ -300,7 +302,7 @@ function AnnualView({
         <View style={styles.row}>
           {annual.bestMonth ? (
             <View style={styles.miniCard}>
-              <Text style={styles.kpiLabel}>Meilleur mois</Text>
+              <Text style={styles.kpiLabel}>Meilleur mois (flux)</Text>
               <Text style={[styles.kpiVal, { fontSize: 15, color: colors.green }]}>{fmt(annual.bestMonth.net)} F</Text>
               <Text style={styles.miniCardSub}>{annual.bestMonth.label}</Text>
             </View>
@@ -316,13 +318,13 @@ function AnnualView({
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Épargne nette · Janvier → Décembre</Text>
+        <Text style={styles.cardTitle}>Épargne totale · Janvier → Décembre</Text>
         <View style={styles.yearRow}>
           {annual.months.map((m) => {
-            const barColor = !m.hasData ? colors.lineSoft : m.net >= 0 ? colors.green : colors.red;
+            const barColor = !m.hasData ? colors.lineSoft : colors.blue;
             return (
               <View key={m.mm} style={styles.yearCol}>
-                <View style={[styles.yearBar, { height: m.hasData ? Math.max((Math.abs(m.net) / maxMonth) * 90, 6) : 4, backgroundColor: barColor }]} />
+                <View style={[styles.yearBar, { height: m.hasData ? Math.max((m.epargneFin / maxMonth) * 90, 6) : 4, backgroundColor: barColor }]} />
                 <Text style={styles.yearLabel}>{MOIS_ABBR[m.mm]}</Text>
               </View>
             );
@@ -367,7 +369,7 @@ function createStyles(colors: ThemeColors) {
     trendLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
     hero: { backgroundColor: colors.anthracite, borderRadius: 20, padding: 18 },
     heroLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2 },
-    heroValue: { fontFamily: fonts.monoBold, fontSize: 26, marginTop: 2, marginBottom: 4, letterSpacing: -0.5 },
+    heroValue: { fontFamily: fonts.monoBold, fontSize: 26, color: "#fff", marginTop: 2, marginBottom: 4, letterSpacing: -0.5 },
     heroUnit: { fontFamily: fonts.sans, fontSize: 14, color: colors.muted2 },
     heroSub: { fontFamily: fonts.sans, fontSize: 11.5, color: colors.muted2, lineHeight: 16 },
     miniCard: { flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 14 },

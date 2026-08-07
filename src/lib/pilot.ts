@@ -1,6 +1,6 @@
 import "server-only";
 import type { SeedData } from "./seed";
-import { bucketKey, defaultCycles, parseState, resolveCycleContext, resolvedOpsForMonth, round, type Bucket, type CycleMonth, type Cycles, type Operation } from "./cycle";
+import { bucketKey, defaultCycles, parseState, resolveCycleContext, resolvedOpsForMonth, round, type Bucket, type Compte, type CycleMonth, type Cycles, type Operation } from "./cycle";
 
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -76,6 +76,7 @@ export type AnnualMonth = {
   depense: number;
   net: number;
   tauxPct: number;
+  epargneFin: number;
 };
 
 export type AnnualCategory = { label: string; value: number; pct: number };
@@ -85,6 +86,7 @@ export type AnnualResponse = {
   availableYears: number[];
   months: AnnualMonth[];
   totals: { revenu: number; depense: number; net: number; tauxPct: number };
+  epargne: { totale: number; debutAnnee: number; croissance: number };
   depCategories: AnnualCategory[];
   revCategories: AnnualCategory[];
   bestMonth: AnnualMonth | null;
@@ -99,6 +101,44 @@ function toAnnualCategories(totals: Record<string, number>): AnnualCategory[] {
     .sort((a, b) => b.value - a.value);
 }
 
+/**
+ * Comptes « épargne » d'un mois donné (avant application des opérations du
+ * mois) : ceux du mois (opening/seed) + les comptes personnalisés globaux
+ * (cycles.customComptes), dédupliqués par nom — même règle que
+ * baseComptes() dans cycle.ts, mais pour un mois arbitraire (pas forcément
+ * le cycle actif), nécessaire pour reconstituer l'épargne mois par mois.
+ */
+function accountsSnapshotForMonth(seed: SeedData, cycles: Cycles, meta: CycleMonth): Compte[] {
+  const monthComptes = (meta.seed ? seed.comptes : (meta.opening?.comptes ?? [])).filter((c) => c.type !== "placement").map((c) => ({ ...c }));
+  const custom = (cycles.customComptes ?? []).map((c) => ({ ...c }));
+  const map = new Map<string, Compte>();
+  custom.concat(monthComptes).forEach((c) => map.set(c.nom, c));
+  return Array.from(map.values());
+}
+
+/** Applique les opérations d'un mois aux soldes de comptes — mêmes règles que liveComptes() dans cycle.ts. */
+function applyOpsDeltas(comptes: Compte[], ops: Operation[]): Compte[] {
+  const map: Record<string, Compte> = {};
+  comptes.forEach((c) => (map[c.nom] = { ...c }));
+  ops.forEach((o) => {
+    const a = Math.abs(o.montant);
+    if (o.type === "dépense" || o.type === "achat_titre") {
+      if (map[o.compte]) map[o.compte].solde -= a;
+    } else if (o.type === "revenu" || o.type === "dividende" || o.type === "vente_titre") {
+      if (map[o.compte]) map[o.compte].solde += a;
+    } else if (o.type === "virement") {
+      if (map[o.compte]) map[o.compte].solde -= a;
+      if (o.compteDest && map[o.compteDest]) map[o.compteDest].solde += a;
+    }
+  });
+  return Object.values(map);
+}
+
+/** Épargne = comptes de type "épargne" (coffres) ou "bloqué" — jamais "disponible" (comptes courants) ni "placement" (BRVM). */
+function savingsTotal(comptes: Compte[]): number {
+  return comptes.filter((c) => c.type === "épargne" || c.type === "bloqué").reduce((s, c) => s + c.solde, 0);
+}
+
 /** Cumul annuel Janvier→Décembre — un mois du plan par cycle existant, sinon vide (pas encore atteint). */
 export function computeAnnualAnalysis(seed: SeedData, state: Record<string, unknown>, year: number): AnnualResponse {
   const cycles = parseState<Cycles>(state, "cycles", defaultCycles());
@@ -108,12 +148,14 @@ export function computeAnnualAnalysis(seed: SeedData, state: Record<string, unkn
   const revCatTotals: Record<string, number> = {};
   let totalRevenu = 0;
   let totalDepense = 0;
+  let epargneDebutAnnee: number | null = null;
+  let epargneTotale = 0;
 
   const months: AnnualMonth[] = MONTHS.map((monthName, i) => {
     const mm = String(i + 1).padStart(2, "0");
     const meta = cycles.months.find((m) => m.year === year && m.mm === mm);
     if (!meta) {
-      return { mm, monthName, label: `${cap(monthName)} ${year}`, hasData: false, revenu: 0, depense: 0, net: 0, tauxPct: 0 };
+      return { mm, monthName, label: `${cap(monthName)} ${year}`, hasData: false, revenu: 0, depense: 0, net: 0, tauxPct: 0, epargneFin: 0 };
     }
     const ops = resolvedOpsForMonth(seed, state, meta);
     const depense = round(ops.filter((o) => o.type === "dépense").reduce((s, o) => s + Math.abs(o.montant), 0));
@@ -127,7 +169,13 @@ export function computeAnnualAnalysis(seed: SeedData, state: Record<string, unkn
     });
     totalRevenu += revenu;
     totalDepense += depense;
-    return { mm, monthName, label: meta.label, hasData: true, revenu, depense, net, tauxPct: revenu > 0 ? Math.round((net / revenu) * 1000) / 10 : 0 };
+
+    const baseAccounts = accountsSnapshotForMonth(seed, cycles, meta);
+    if (epargneDebutAnnee == null) epargneDebutAnnee = round(savingsTotal(baseAccounts));
+    const epargneFin = round(savingsTotal(applyOpsDeltas(baseAccounts, ops)));
+    epargneTotale = epargneFin;
+
+    return { mm, monthName, label: meta.label, hasData: true, revenu, depense, net, tauxPct: revenu > 0 ? Math.round((net / revenu) * 1000) / 10 : 0, epargneFin };
   });
 
   const totalNet = totalRevenu - totalDepense;
@@ -144,6 +192,11 @@ export function computeAnnualAnalysis(seed: SeedData, state: Record<string, unkn
       depense: round(totalDepense),
       net: round(totalNet),
       tauxPct: totalRevenu > 0 ? Math.round((totalNet / totalRevenu) * 1000) / 10 : 0,
+    },
+    epargne: {
+      totale: round(epargneTotale),
+      debutAnnee: round(epargneDebutAnnee ?? 0),
+      croissance: round(epargneTotale - (epargneDebutAnnee ?? 0)),
     },
     depCategories: toAnnualCategories(depCatTotals),
     revCategories: toAnnualCategories(revCatTotals),
