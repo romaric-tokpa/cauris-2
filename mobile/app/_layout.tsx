@@ -9,6 +9,8 @@ import { ActivityIndicator, AppState, type AppStateStatus, View } from "react-na
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import BiometricGate from "../components/BiometricGate";
 import { AuthProvider, useAuth } from "../lib/AuthContext";
+import { useIsOnline } from "../lib/network";
+import { syncQueue } from "../lib/offlineQueue";
 import { PrefsProvider, useColors, usePrefs } from "../lib/prefs";
 import { ProfileProvider } from "../lib/ProfileContext";
 import { colors as staticColors } from "../lib/theme";
@@ -24,10 +26,16 @@ function RootNavigator() {
   const backgroundedAt = useRef<number | null>(null);
   const biometricRef = useRef(biometric);
   biometricRef.current = biometric;
+  const online = useIsOnline();
 
   useEffect(() => {
     if (!isLoggedIn) setUnlocked(false);
   }, [isLoggedIn]);
+
+  // Synchronise la file d'opérations créées hors ligne dès que le réseau revient (ou dès le démarrage si déjà en ligne).
+  useEffect(() => {
+    if (isLoggedIn && online) syncQueue();
+  }, [isLoggedIn, online]);
 
   useEffect(() => {
     function onChange(next: AppStateStatus) {

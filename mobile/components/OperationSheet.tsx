@@ -9,6 +9,7 @@ import Sheet from "./Sheet";
 import Switch from "./Switch";
 import { apiFetch, UnauthorizedError } from "../lib/api";
 import { CATEGORIES_DEPENSE, CATEGORIES_REVENU } from "../lib/categories";
+import { enqueueOperation } from "../lib/offlineQueue";
 import { useColors } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
 
@@ -101,23 +102,23 @@ export default function OperationSheet({ visible, onClose, onSaved, onUnauthoriz
     if (!compte) return setError("Choisis un compte.");
     if (isVir && !compteDest) return setError("Choisis un compte de destination.");
 
+    const body: Record<string, unknown> = {
+      type,
+      montant: montantNum,
+      date: date.trim(),
+      lib: lib.trim(),
+      compte,
+      compteDest: isVir ? compteDest : undefined,
+      cat: !isVir ? cat : undefined,
+    };
+    if (!editing && frais) body.frais = parseFloat(frais);
+    if (!editing && type === "dépense" && asDette) {
+      body.asDette = true;
+      body.detteEcheance = detteEcheance.trim() || undefined;
+    }
+
     setSaving(true);
     try {
-      const body: Record<string, unknown> = {
-        type,
-        montant: montantNum,
-        date: date.trim(),
-        lib: lib.trim(),
-        compte,
-        compteDest: isVir ? compteDest : undefined,
-        cat: !isVir ? cat : undefined,
-      };
-      if (!editing && frais) body.frais = parseFloat(frais);
-      if (!editing && type === "dépense" && asDette) {
-        body.asDette = true;
-        body.detteEcheance = detteEcheance.trim() || undefined;
-      }
-
       const res = editing
         ? await apiFetch(`/api/operations/${editing.id}`, { method: "PATCH", body: JSON.stringify(body) })
         : await apiFetch("/api/operations", { method: "POST", body: JSON.stringify(body) });
@@ -130,7 +131,14 @@ export default function OperationSheet({ visible, onClose, onSaved, onUnauthoriz
       onSaved();
     } catch (e) {
       if (e instanceof UnauthorizedError) return onUnauthorized();
-      setError("Échec de l'enregistrement.");
+      // apiFetch ne lève que sur un échec réseau (401 est géré à part) : hors ligne, on met en file au lieu d'échouer,
+      // uniquement pour une NOUVELLE opération — modifier/supprimer une opération existante exige d'être en ligne.
+      if (!editing) {
+        await enqueueOperation(body);
+        onSaved();
+        return;
+      }
+      setError("Échec de l'enregistrement — vérifie ta connexion.");
     } finally {
       setSaving(false);
     }

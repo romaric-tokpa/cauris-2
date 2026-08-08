@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import NotificationsSheet from "../../components/NotificationsSheet";
@@ -10,11 +10,14 @@ import ScreenFade from "../../components/ScreenFade";
 import MultiSegmentedBar from "../../components/MultiSegmentedBar";
 import SegmentedBar from "../../components/SegmentedBar";
 import Tap from "../../components/Tap";
+import OfflineBanner from "../../components/OfflineBanner";
 import { apiFetch, UnauthorizedError } from "../../lib/api";
 import { useAuth } from "../../lib/AuthContext";
 import { currencySymbol } from "../../lib/currency";
 import { fmt } from "../../lib/format";
 import { fetchNotifications } from "../../lib/notifications";
+import { cacheGet, cacheSet } from "../../lib/offlineCache";
+import { useQueueLength } from "../../lib/offlineQueue";
 import { maskAmount, useColors, usePrefs } from "../../lib/prefs";
 import { useProfilePhoto } from "../../lib/ProfileContext";
 import { coffreColorsFor, fonts, type ThemeColors } from "../../lib/theme";
@@ -50,17 +53,34 @@ export default function AccueilScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetType, setSheetType] = useState<"dépense" | "revenu" | "virement">("dépense");
   const displayBalance = useCountUp(dashboard?.kpis.disponible ?? 0);
+  const queueLength = useQueueLength();
 
   const load = useCallback(async () => {
     try {
       const [dRes, cRes, oRes] = await Promise.all([apiFetch("/api/dashboard"), apiFetch("/api/coffres"), apiFetch("/api/operations")]);
-      setDashboard(await dRes.json());
-      setCoffres(await cRes.json());
-      setOps(await oRes.json());
+      const [d, c, o] = await Promise.all([dRes.json(), cRes.json(), oRes.json()]);
+      setDashboard(d);
+      setCoffres(c);
+      setOps(o);
       setError(null);
+      cacheSet("dashboard", d);
+      cacheSet("coffres", c);
+      cacheSet("operations", o);
     } catch (e) {
       if (e instanceof UnauthorizedError) return logout();
-      setError("Impossible de charger les données.");
+      const [d, c, o] = await Promise.all([
+        cacheGet<DashboardResponse>("dashboard"),
+        cacheGet<CoffresResponse>("coffres"),
+        cacheGet<OperationsFeedResponse>("operations"),
+      ]);
+      if (d && c && o) {
+        setDashboard(d);
+        setCoffres(c);
+        setOps(o);
+        setError(null);
+      } else {
+        setError("Impossible de charger les données — connecte-toi au moins une fois pour pouvoir travailler hors ligne.");
+      }
     }
     fetchNotifications()
       .then((n) => setNotifCount(n.length))
@@ -72,6 +92,10 @@ export default function AccueilScreen() {
       load();
     }, [load]),
   );
+
+  useEffect(() => {
+    load();
+  }, [queueLength, load]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -149,6 +173,8 @@ export default function AccueilScreen() {
             </Tap>
           </View>
         </View>
+
+        <OfflineBanner />
 
         <View style={styles.balanceCard}>
           <Pressable style={styles.balanceToggle} onPress={toggleHideAmounts}>
