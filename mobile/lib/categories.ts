@@ -18,4 +18,4 @@ export const CATEGORIES_DEPENSE = [
   "Divers",
 ];
 
-export const CATEGORIES_REVENU = ["Salaire", "Remboursement", "Intérêts épargne", "Autre"];
+export const CATEGORIES_REVENU = ["Salaire", "Freelance", "Remboursement", "Intérêts épargne", "Autre"];

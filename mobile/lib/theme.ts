@@ -6,7 +6,11 @@ export const lightColors = {
   beton: "#F5F3EF",
   hivis: "#F2C200",
   green: "#1F8A5B",
-  red: "#C8431B",
+  // Distinct de `orange` : les deux étaient auparavant à la même teinte (~15°, brique/orangé),
+  // ce qui rendait dépense (rouge) et actions principales (orange) difficiles à distinguer d'un
+  // coup d'œil sur les puces/icônes. Décalé vers une teinte plus rouge (~5°) tout en restant dans
+  // la même famille sourde/terreuse que le reste de la charte.
+  red: "#C23B2E",
   blue: "#2A6FDB",
   violet: "#7A4FD0",
   ink: "#1C2025",
@@ -24,7 +28,10 @@ export const lightColors = {
   lineSoft: "rgba(28,32,37,0.06)",
   fillSoft: "#F1EFEA",
   screenBg: "#F6F5F1",
-  activePill: "#FBE0D4",
+  // Fond doux pour l'orange, au même titre que amberBg/greenBg/redBg/blueBg/violetBg —
+  // seul l'orange (couleur de marque la plus utilisée) n'avait pas son propre fond avant,
+  // ce qui forçait à détourner redBg comme approximation par endroits (FleetOS, notifications).
+  orangeBg: "#FBE0D4",
   amber: "#C99A00",
   amberBg: "#FBEFD6",
   greenBg: "#E1F1E9",
@@ -32,6 +39,13 @@ export const lightColors = {
   blueBg: "#E4EDFB",
   violetBg: "#EFE7FA",
   segmentOff: "#E7E4DE",
+  // Variantes vives indépendantes du thème, pour du texte/chiffres sur une surface qui reste
+  // sombre quel que soit le thème actif (cartes hero anthracite, dégradé de login/biométrie) —
+  // `green`/`red`/`muted` sont réglés pour du texte sur `paper`, pas assez vifs sur `anthracite`.
+  // Avant ce token, chaque écran redéfinissait ces couleurs en dur (`#4ED88F`, `#FF9E7A`...).
+  onDarkGreen: "#4ED88F",
+  onDarkRed: "#FF9E7A",
+  onDarkMuted: "#B8BEC6",
 };
 
 /**
@@ -46,7 +60,7 @@ export const darkColors: typeof lightColors = {
   beton: "#1C1F23",
   hivis: "#F2C200",
   green: "#1F8A5B",
-  red: "#C8431B",
+  red: "#C23B2E",
   blue: "#2A6FDB",
   violet: "#7A4FD0",
   ink: "#F2F1EE",
@@ -60,7 +74,7 @@ export const darkColors: typeof lightColors = {
   lineSoft: "rgba(255,255,255,0.08)",
   fillSoft: "#20242A",
   screenBg: "#121417",
-  activePill: "rgba(226,84,26,0.22)",
+  orangeBg: "rgba(226,84,26,0.22)",
   amber: "#D9AC1A",
   amberBg: "rgba(201,154,0,0.18)",
   greenBg: "rgba(31,138,91,0.18)",
@@ -68,6 +82,9 @@ export const darkColors: typeof lightColors = {
   blueBg: "rgba(42,111,219,0.18)",
   violetBg: "rgba(122,79,208,0.18)",
   segmentOff: "#2A2E34",
+  onDarkGreen: "#4ED88F",
+  onDarkRed: "#FF9E7A",
+  onDarkMuted: "#B8BEC6",
 };
 
 export type ThemeColors = typeof lightColors;

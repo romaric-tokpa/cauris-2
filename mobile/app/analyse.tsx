@@ -52,8 +52,17 @@ const MOIS_ABBR: Record<string, string> = {
   "12": "Déc",
 };
 
-function AnnualBars({ items, color, styles }: { items: AnnualCat[]; color: string; styles: ReturnType<typeof createStyles> }) {
-  if (!items.length) return <Text style={styles.empty}>Aucune donnée.</Text>;
+function NoData({ colors, styles }: { colors: ThemeColors; styles: ReturnType<typeof createStyles> }) {
+  return (
+    <View style={styles.emptyWrap}>
+      <Feather name="bar-chart-2" size={20} color={colors.muted} />
+      <Text style={styles.empty}>Aucune donnée.</Text>
+    </View>
+  );
+}
+
+function AnnualBars({ items, color, colors, styles }: { items: AnnualCat[]; color: string; colors: ThemeColors; styles: ReturnType<typeof createStyles> }) {
+  if (!items.length) return <NoData colors={colors} styles={styles} />;
   const max = items[0].value;
   return (
     <View style={{ gap: 12 }}>
@@ -74,8 +83,8 @@ function AnnualBars({ items, color, styles }: { items: AnnualCat[]; color: strin
   );
 }
 
-function Bars({ items, color, styles }: { items: Cat[]; color: string; styles: ReturnType<typeof createStyles> }) {
-  if (!items.length) return <Text style={styles.empty}>Aucune donnée.</Text>;
+function Bars({ items, color, colors, styles }: { items: Cat[]; color: string; colors: ThemeColors; styles: ReturnType<typeof createStyles> }) {
+  if (!items.length) return <NoData colors={colors} styles={styles} />;
   const max = items[0].value;
   return (
     <View style={{ gap: 12 }}>
@@ -149,6 +158,13 @@ export default function AnalyseScreen() {
     loadAnnual(y);
   }
 
+  const fallbackId = (pilot?.months.find((m) => m.isActive) ?? pilot?.months[pilot.months.length - 1])?.id;
+  const effectiveMonthId = selectedMonthId ?? fallbackId;
+  const active = pilot?.months.find((m) => m.id === effectiveMonthId) ?? pilot?.months[pilot.months.length - 1];
+  const displayRevenu = useCountUp(active?.revenu ?? 0);
+  const displayDepense = useCountUp(active?.depense ?? 0);
+  const displayNet = useCountUp(Math.abs(active?.net ?? 0));
+
   if (error) {
     return (
       <OverlayScreen title="Analyse">
@@ -165,9 +181,6 @@ export default function AnalyseScreen() {
   }
 
   const monthsDesc = [...pilot.months].reverse();
-  const fallbackId = (pilot.months.find((m) => m.isActive) ?? pilot.months[pilot.months.length - 1])?.id;
-  const effectiveMonthId = selectedMonthId ?? fallbackId;
-  const active = pilot.months.find((m) => m.id === effectiveMonthId) ?? pilot.months[pilot.months.length - 1];
   const trend = pilot.months.slice(-4);
   const maxTrend = Math.max(...trend.map((m) => Math.abs(m.net)), 1);
   const urgence = coffres.coffres.find((c) => c.nom.toLowerCase().includes("urgence"));
@@ -195,22 +208,42 @@ export default function AnalyseScreen() {
           <>
             <View style={styles.kpiGrid}>
               <View style={styles.kpi}>
-                <Text style={styles.kpiLabel}>Revenus</Text>
-                <Text style={[styles.kpiVal, { color: colors.green }]}>{fmt(active?.revenu ?? 0)}</Text>
+                <View style={styles.kpiHead}>
+                  <Text style={styles.kpiLabel}>Revenus</Text>
+                  <View style={[styles.kpiIcon, { backgroundColor: colors.greenBg }]}>
+                    <Feather name="arrow-up" size={12} color={colors.green} />
+                  </View>
+                </View>
+                <Text style={[styles.kpiVal, { color: colors.green }]}>{fmt(displayRevenu)}</Text>
               </View>
               <View style={styles.kpi}>
-                <Text style={styles.kpiLabel}>Dépenses</Text>
-                <Text style={[styles.kpiVal, { color: colors.red }]}>{fmt(active?.depense ?? 0)}</Text>
+                <View style={styles.kpiHead}>
+                  <Text style={styles.kpiLabel}>Dépenses</Text>
+                  <View style={[styles.kpiIcon, { backgroundColor: colors.redBg }]}>
+                    <Feather name="arrow-down" size={12} color={colors.red} />
+                  </View>
+                </View>
+                <Text style={[styles.kpiVal, { color: colors.red }]}>{fmt(displayDepense)}</Text>
               </View>
               <View style={styles.kpi}>
-                <Text style={styles.kpiLabel}>Épargne nette</Text>
-                <Text style={styles.kpiVal}>
+                <View style={styles.kpiHead}>
+                  <Text style={styles.kpiLabel}>Épargne nette</Text>
+                  <View style={[styles.kpiIcon, { backgroundColor: (active?.net ?? 0) >= 0 ? colors.greenBg : colors.redBg }]}>
+                    <Feather name="activity" size={12} color={(active?.net ?? 0) >= 0 ? colors.green : colors.red} />
+                  </View>
+                </View>
+                <Text style={[styles.kpiVal, { color: (active?.net ?? 0) >= 0 ? colors.ink : colors.red }]}>
                   {(active?.net ?? 0) >= 0 ? "+" : "−"}
-                  {fmt(Math.abs(active?.net ?? 0))}
+                  {fmt(displayNet)}
                 </Text>
               </View>
               <View style={styles.kpi}>
-                <Text style={styles.kpiLabel}>Taux d&apos;épargne</Text>
+                <View style={styles.kpiHead}>
+                  <Text style={styles.kpiLabel}>Taux d&apos;épargne</Text>
+                  <View style={[styles.kpiIcon, { backgroundColor: colors.greenBg }]}>
+                    <Feather name="percent" size={12} color={colors.green} />
+                  </View>
+                </View>
                 <Text style={[styles.kpiVal, { color: colors.green }]}>{(active?.tauxPct ?? 0).toFixed(0)}%</Text>
               </View>
             </View>
@@ -232,12 +265,12 @@ export default function AnalyseScreen() {
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Top dépenses par catégorie</Text>
-              <Bars items={active?.depCategories ?? []} color={colors.red} styles={styles} />
+              <Bars items={active?.depCategories ?? []} color={colors.red} colors={colors} styles={styles} />
             </View>
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Top revenus par source</Text>
-              <Bars items={active?.revCategories ?? []} color={colors.green} styles={styles} />
+              <Bars items={active?.revCategories ?? []} color={colors.green} colors={colors} styles={styles} />
             </View>
 
             <View style={styles.card}>
@@ -318,19 +351,39 @@ function AnnualView({
 
       <View style={styles.kpiGrid}>
         <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Revenus {annual.year}</Text>
+          <View style={styles.kpiHead}>
+            <Text style={styles.kpiLabel}>Revenus {annual.year}</Text>
+            <View style={[styles.kpiIcon, { backgroundColor: colors.greenBg }]}>
+              <Feather name="arrow-up" size={12} color={colors.green} />
+            </View>
+          </View>
           <Text style={[styles.kpiVal, { color: colors.green }]}>{fmt(annual.totals.revenu)}</Text>
         </View>
         <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Dépenses {annual.year}</Text>
+          <View style={styles.kpiHead}>
+            <Text style={styles.kpiLabel}>Dépenses {annual.year}</Text>
+            <View style={[styles.kpiIcon, { backgroundColor: colors.redBg }]}>
+              <Feather name="arrow-down" size={12} color={colors.red} />
+            </View>
+          </View>
           <Text style={[styles.kpiVal, { color: colors.red }]}>{fmt(annual.totals.depense)}</Text>
         </View>
         <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Mois avec données</Text>
+          <View style={styles.kpiHead}>
+            <Text style={styles.kpiLabel}>Mois avec données</Text>
+            <View style={[styles.kpiIcon, { backgroundColor: colors.fillSoft }]}>
+              <Feather name="calendar" size={12} color={colors.muted} />
+            </View>
+          </View>
           <Text style={styles.kpiVal}>{annual.monthsWithData} / 12</Text>
         </View>
         <View style={styles.kpi}>
-          <Text style={styles.kpiLabel}>Taux d&apos;épargne</Text>
+          <View style={styles.kpiHead}>
+            <Text style={styles.kpiLabel}>Taux d&apos;épargne</Text>
+            <View style={[styles.kpiIcon, { backgroundColor: annual.epargne.tauxPct >= 0 ? colors.greenBg : colors.redBg }]}>
+              <Feather name="percent" size={12} color={annual.epargne.tauxPct >= 0 ? colors.green : colors.red} />
+            </View>
+          </View>
           <Text style={[styles.kpiVal, { color: annual.epargne.tauxPct >= 0 ? colors.green : colors.red }]}>{annual.epargne.tauxPct}%</Text>
         </View>
       </View>
@@ -340,8 +393,9 @@ function AnnualView({
           {annual.bestMonth ? (
             <View style={styles.miniCard}>
               <Text style={styles.kpiLabel}>Meilleur mois (flux)</Text>
-              <Text style={[styles.kpiVal, { fontSize: 15, color: colors.green }]}>
-                {fmt(annual.bestMonth.net)} {currencySymbol()}
+              <Text style={[styles.kpiVal, { fontSize: 15, color: annual.bestMonth.net >= 0 ? colors.green : colors.red }]}>
+                {annual.bestMonth.net >= 0 ? "+" : "−"}
+                {fmt(Math.abs(annual.bestMonth.net))} {currencySymbol()}
               </Text>
               <Text style={styles.miniCardSub}>{annual.bestMonth.label}</Text>
             </View>
@@ -349,8 +403,9 @@ function AnnualView({
           {annual.worstMonth ? (
             <View style={styles.miniCard}>
               <Text style={styles.kpiLabel}>Mois le plus difficile</Text>
-              <Text style={[styles.kpiVal, { fontSize: 15, color: colors.red }]}>
-                {fmt(annual.worstMonth.net)} {currencySymbol()}
+              <Text style={[styles.kpiVal, { fontSize: 15, color: annual.worstMonth.net >= 0 ? colors.green : colors.red }]}>
+                {annual.worstMonth.net >= 0 ? "+" : "−"}
+                {fmt(Math.abs(annual.worstMonth.net))} {currencySymbol()}
               </Text>
               <Text style={styles.miniCardSub}>{annual.worstMonth.label}</Text>
             </View>
@@ -375,12 +430,12 @@ function AnnualView({
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Dépenses par catégorie · cumul {annual.year}</Text>
-        <AnnualBars items={annual.depCategories} color={colors.red} styles={styles} />
+        <AnnualBars items={annual.depCategories} color={colors.red} colors={colors} styles={styles} />
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Revenus par source · cumul {annual.year}</Text>
-        <AnnualBars items={annual.revCategories} color={colors.green} styles={styles} />
+        <AnnualBars items={annual.revCategories} color={colors.green} colors={colors} styles={styles} />
       </View>
 
       <View style={styles.card}>
@@ -443,17 +498,20 @@ function createStyles(colors: ThemeColors) {
     monthPickerRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 12 },
     monthPickerRowActive: { backgroundColor: colors.fillSoft },
     monthPickerLabel: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-    monthPickerBadge: { backgroundColor: colors.activePill, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+    monthPickerBadge: { backgroundColor: colors.orangeBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
     monthPickerBadgeText: { fontFamily: fonts.sansSemiBold, fontSize: 10.5, color: colors.orange },
     kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
     kpi: { flexBasis: "48%", flexGrow: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 14 },
-    kpiLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2, marginBottom: 6 },
+    kpiHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 },
+    kpiIcon: { width: 22, height: 22, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+    kpiLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2 },
     kpiVal: { fontFamily: fonts.monoBold, fontSize: 19, color: colors.ink },
     row: { flexDirection: "row", gap: 10 },
     fraisCard: { flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 14 },
     urgenceCard: { flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     card: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 18, padding: 16 },
     cardTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink, marginBottom: 14 },
+    emptyWrap: { alignItems: "center", gap: 8, paddingVertical: 6 },
     empty: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
     barHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
     barLabel: { flex: 1, minWidth: 0, marginRight: 8, fontFamily: fonts.sans, fontSize: 13, color: colors.ink },
@@ -467,7 +525,6 @@ function createStyles(colors: ThemeColors) {
     heroLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2 },
     heroValue: { fontFamily: fonts.monoBold, fontSize: 26, color: "#fff", marginTop: 2, marginBottom: 4, letterSpacing: -0.5 },
     heroUnit: { fontFamily: fonts.sans, fontSize: 14, color: colors.muted2 },
-    heroSub: { fontFamily: fonts.sans, fontSize: 11.5, color: colors.muted2, lineHeight: 16 },
     miniCard: { flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 14 },
     miniCardSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2, marginTop: 2 },
     yearRow: { flexDirection: "row", alignItems: "flex-end", gap: 4, height: 110 },

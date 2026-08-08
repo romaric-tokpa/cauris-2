@@ -1,9 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Sheet from "./Sheet";
+import Tap from "./Tap";
 import { fetchNotifications, type Notif, type NotifKind } from "../lib/notifications";
+import { markAllRead, markRead, useReadIds } from "../lib/notificationsRead";
 import { useColors } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
 
@@ -13,7 +15,7 @@ function kindStyleFor(colors: ThemeColors): Record<NotifKind, { bg: string; c: s
   return {
     budget: { bg: colors.redBg, c: colors.red },
     pret: { bg: colors.blueBg, c: colors.blue },
-    fleetos: { bg: colors.redBg, c: colors.orange },
+    fleetos: { bg: colors.orangeBg, c: colors.orange },
     dette: { bg: colors.amberBg, c: colors.amber },
   };
 }
@@ -24,7 +26,7 @@ export default function NotificationsSheet({ visible, onClose }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const KIND_STYLE = useMemo(() => kindStyleFor(colors), [colors]);
   const [notifs, setNotifs] = useState<Notif[] | null>(null);
-  const [read, setRead] = useState<Set<string>>(new Set());
+  const readIds = useReadIds();
 
   useEffect(() => {
     if (!visible) return;
@@ -33,7 +35,7 @@ export default function NotificationsSheet({ visible, onClose }: Props) {
       .catch(() => setNotifs([]));
   }, [visible]);
 
-  const visibleNotifs = (notifs ?? []).filter((n) => !read.has(n.id));
+  const visibleNotifs = (notifs ?? []).filter((n) => !readIds.has(n.id));
 
   return (
     <Sheet
@@ -43,13 +45,13 @@ export default function NotificationsSheet({ visible, onClose }: Props) {
       headerRight={
         <View style={styles.headerActions}>
           {visibleNotifs.length > 0 ? (
-            <Pressable onPress={() => setRead(new Set((notifs ?? []).map((n) => n.id)))} hitSlop={8}>
+            <Tap onPress={() => markAllRead((notifs ?? []).map((n) => n.id))} hitSlop={8}>
               <Text style={styles.markAll}>Tout lire</Text>
-            </Pressable>
+            </Tap>
           ) : null}
-          <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={8}>
+          <Tap style={styles.closeBtn} onPress={onClose} hitSlop={8}>
             <Feather name="x" size={18} color={colors.muted} />
-          </Pressable>
+          </Tap>
         </View>
       }
     >
@@ -63,7 +65,7 @@ export default function NotificationsSheet({ visible, onClose }: Props) {
         </View>
       ) : (
         visibleNotifs.map((n) => (
-          <Pressable
+          <Tap
             key={n.id}
             style={styles.row}
             onPress={() => {
@@ -82,16 +84,16 @@ export default function NotificationsSheet({ visible, onClose }: Props) {
                 {n.sub}
               </Text>
             </View>
-            <Pressable
+            <Tap
               style={styles.dismiss}
               onPress={(e) => {
                 e.stopPropagation();
-                setRead((prev) => new Set(prev).add(n.id));
+                markRead(n.id);
               }}
             >
               <Feather name="check" size={16} color={colors.green} />
-            </Pressable>
-          </Pressable>
+            </Tap>
+          </Tap>
         ))
       )}
     </Sheet>

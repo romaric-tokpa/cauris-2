@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import CoffreSheet from "../components/CoffreSheet";
@@ -89,43 +90,57 @@ export default function CoffresScreen() {
           <View style={styles.heroStatsRow}>
             <View>
               <Text style={styles.heroStatLabel}>Accessible</Text>
-              <Text style={[styles.heroStatValue, { color: "#4ED88F" }]}>{maskAmount(fmt(data.overview.accessible), hideAmounts)}</Text>
+              <Text style={[styles.heroStatValue, { color: colors.onDarkGreen }]}>{maskAmount(fmt(data.overview.accessible), hideAmounts)}</Text>
             </View>
             <View>
               <Text style={styles.heroStatLabel}>Bloquée</Text>
-              <Text style={[styles.heroStatValue, { color: "#B8BEC6" }]}>{maskAmount(fmt(data.overview.bloquee), hideAmounts)}</Text>
+              <Text style={[styles.heroStatValue, { color: colors.onDarkMuted }]}>{maskAmount(fmt(data.overview.bloquee), hideAmounts)}</Text>
             </View>
           </View>
         </View>
 
-        {data.coffres.map((c, i) => (
-          <View key={c.nom} style={styles.coffreCard}>
-            <RingProgress pct={c.pct} color={coffreColors[i % coffreColors.length]} size={66} />
-            <View style={{ flex: 1 }}>
-              <View style={styles.coffreHead}>
-                <Text style={styles.coffreNom} numberOfLines={1}>
-                  {c.nom}
+        <Text style={styles.sectionTitle}>Coffres · {data.coffres.length}</Text>
+        {data.coffres.length ? (
+          data.coffres.map((c, i) => (
+            <View key={c.nom} style={styles.coffreCard}>
+              <RingProgress pct={c.pct} color={coffreColors[i % coffreColors.length]} size={66} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.coffreHead}>
+                  <Text style={styles.coffreNom} numberOfLines={1}>
+                    {c.nom}
+                  </Text>
+                  <Text style={[styles.coffreRank, coffreBadgeColors(c, colors)]}>{c.rank}</Text>
+                </View>
+                <Text style={styles.coffreVal}>
+                  <Text style={{ fontWeight: "700" }}>{maskAmount(fmt(c.epargne), hideAmounts)}</Text>
+                  <Text style={{ color: colors.muted2 }}>
+                    {" "}
+                    / {fmt(c.objectif)} {currencySymbol()}
+                  </Text>
                 </Text>
-                <Text style={[styles.coffreRank, coffreBadgeColors(c, colors)]}>{c.rank}</Text>
+                <Text style={styles.coffreReste}>
+                  Reste {maskAmount(fmt(Math.max(c.objectif - c.epargne, 0)), hideAmounts)} {currencySymbol()}
+                </Text>
               </View>
-              <Text style={styles.coffreVal}>
-                <Text style={{ fontWeight: "700" }}>{maskAmount(fmt(c.epargne), hideAmounts)}</Text>
-                <Text style={{ color: colors.muted2 }}>
-                  {" "}
-                  / {fmt(c.objectif)} {currencySymbol()}
-                </Text>
-              </Text>
-              <Text style={styles.coffreReste}>
-                Reste {maskAmount(fmt(Math.max(c.objectif - c.epargne, 0)), hideAmounts)} {currencySymbol()}
-              </Text>
             </View>
-          </View>
-        ))}
+          ))
+        ) : (
+          <Tap style={styles.coffresEmpty} onPress={() => setSheetOpen(true)}>
+            <View style={styles.coffresEmptyIcon}>
+              <Feather name="lock" size={18} color={colors.muted2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.coffresEmptyTitle}>Aucun coffre pour l&apos;instant</Text>
+              <Text style={styles.coffresEmptySub}>Touchez « + Coffre » pour créer le premier</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={colors.muted2} />
+          </Tap>
+        )}
 
         {data.detteReste > 0 ? (
           <View style={styles.detteAlert}>
             <View style={styles.detteAlertIcon}>
-              <Text style={{ fontSize: 16 }}>⚠</Text>
+              <Feather name="alert-triangle" size={16} color={colors.anthracite} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.detteAlertTitle}>
@@ -195,10 +210,23 @@ function createStyles(colors: ThemeColors) {
   coffreRank: { fontFamily: fonts.sansSemiBold, fontSize: 10, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   coffreVal: { fontFamily: fonts.mono, fontSize: 14, color: colors.ink, marginTop: 4 },
   coffreReste: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2, marginTop: 2 },
+  coffresEmpty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    borderRadius: 18,
+    padding: 14,
+  },
+  coffresEmptyIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.fillSoft, alignItems: "center", justifyContent: "center" },
+  coffresEmptyTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.ink },
+  coffresEmptySub: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2, marginTop: 2 },
   detteAlert: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.amberBg, borderWidth: 1, borderColor: colors.hivis, borderRadius: 16, padding: 14 },
   detteAlertIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.hivis, alignItems: "center", justifyContent: "center" },
   detteAlertTitle: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.ink },
-  detteAlertSub: { fontFamily: fonts.sans, fontSize: 12, color: "#8A7A3A", marginTop: 2 },
+  detteAlertSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, marginTop: 2 },
   sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", color: colors.muted2, marginBottom: 6, marginTop: 4 },
   detteList: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 18, overflow: "hidden" },
   detteRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },

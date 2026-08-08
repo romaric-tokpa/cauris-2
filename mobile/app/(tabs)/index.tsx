@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import NotificationsSheet from "../../components/NotificationsSheet";
 import OperationSheet from "../../components/OperationSheet";
@@ -15,7 +15,8 @@ import { apiFetch, UnauthorizedError } from "../../lib/api";
 import { useAuth } from "../../lib/AuthContext";
 import { currencySymbol } from "../../lib/currency";
 import { fmt } from "../../lib/format";
-import { fetchNotifications } from "../../lib/notifications";
+import { fetchNotifications, type Notif } from "../../lib/notifications";
+import { useReadIds } from "../../lib/notificationsRead";
 import { cacheGet, cacheSet } from "../../lib/offlineCache";
 import { useQueueLength } from "../../lib/offlineQueue";
 import { maskAmount, useColors, usePrefs } from "../../lib/prefs";
@@ -34,6 +35,13 @@ type OperationsFeedResponse = { activeMonthMm: string; accounts: { nom: string; 
 
 type Action = { label: string; icon: keyof typeof Feather.glyphMap; onPress: () => void };
 
+function greetingFor(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bonjour,";
+  if (h < 18) return "Bon après-midi,";
+  return "Bonsoir,";
+}
+
 export default function AccueilScreen() {
   const { logout } = useAuth();
   const router = useRouter();
@@ -49,7 +57,9 @@ export default function AccueilScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifCount, setNotifCount] = useState(0);
+  const [notifs, setNotifs] = useState<Notif[]>([]);
+  const readIds = useReadIds();
+  const notifCount = notifs.filter((n) => !readIds.has(n.id)).length;
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetType, setSheetType] = useState<"dépense" | "revenu" | "virement">("dépense");
   const displayBalance = useCountUp(dashboard?.kpis.disponible ?? 0);
@@ -83,8 +93,8 @@ export default function AccueilScreen() {
       }
     }
     fetchNotifications()
-      .then((n) => setNotifCount(n.length))
-      .catch(() => setNotifCount(0));
+      .then(setNotifs)
+      .catch(() => setNotifs([]));
   }, [logout]);
 
   useFocusEffect(
@@ -151,7 +161,7 @@ export default function AccueilScreen() {
               {photo ? <Image source={{ uri: photo }} style={styles.avatarImg} /> : <Text style={styles.avatarText}>RT</Text>}
             </View>
             <View>
-              <Text style={styles.greeting}>Bonjour,</Text>
+              <Text style={styles.greeting}>{greetingFor()}</Text>
               <Text style={styles.name}>Romaric</Text>
             </View>
           </View>
@@ -177,10 +187,10 @@ export default function AccueilScreen() {
         <OfflineBanner />
 
         <View style={styles.balanceCard}>
-          <Pressable style={styles.balanceToggle} onPress={toggleHideAmounts}>
+          <Tap style={styles.balanceToggle} onPress={toggleHideAmounts}>
             <Text style={styles.balanceLabel}>Comptes disponibles</Text>
             <Feather name={hideAmounts ? "eye-off" : "eye"} size={15} color={colors.muted} />
-          </Pressable>
+          </Tap>
           <Text style={styles.balanceValue}>
             {maskAmount(fmt(displayBalance), hideAmounts)} <Text style={styles.balanceUnit}>{currencySymbol()}</Text>
           </Text>
@@ -208,29 +218,42 @@ export default function AccueilScreen() {
         <View>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Coffres actifs</Text>
-            <Pressable onPress={() => router.push("/coffres")}>
+            <Tap onPress={() => router.push("/coffres")}>
               <Text style={styles.sectionLink}>Voir tout</Text>
-            </Pressable>
+            </Tap>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.coffresScroll} contentContainerStyle={styles.coffresContent}>
-            {coffres.coffres.map((c, i) => (
-              <Tap key={c.nom} style={styles.coffreCard} onPress={() => router.push("/coffres")}>
-                <Text style={styles.coffreNom} numberOfLines={1}>
-                  {c.nom}
-                </Text>
-                <View style={styles.coffreValRow}>
-                  <Text style={styles.coffreVal} numberOfLines={1}>
-                    <Text style={{ fontWeight: "700" }}>{maskAmount(fmt(c.epargne), hideAmounts)}</Text>
-                    <Text style={styles.coffreValMuted}> / {fmt(c.objectif)}</Text>
+          {coffres.coffres.length ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.coffresScroll} contentContainerStyle={styles.coffresContent}>
+              {coffres.coffres.map((c, i) => (
+                <Tap key={c.nom} style={styles.coffreCard} onPress={() => router.push("/coffres")}>
+                  <Text style={styles.coffreNom} numberOfLines={1}>
+                    {c.nom}
                   </Text>
-                  <Text style={styles.coffrePct} numberOfLines={1}>
-                    {c.pct.toFixed(0)}%
-                  </Text>
-                </View>
-                <SegmentedBar pct={c.pct} color={coffreColors[i % coffreColors.length]} />
-              </Tap>
-            ))}
-          </ScrollView>
+                  <View style={styles.coffreValRow}>
+                    <Text style={styles.coffreVal} numberOfLines={1}>
+                      <Text style={{ fontWeight: "700" }}>{maskAmount(fmt(c.epargne), hideAmounts)}</Text>
+                      <Text style={styles.coffreValMuted}> / {fmt(c.objectif)}</Text>
+                    </Text>
+                    <Text style={styles.coffrePct} numberOfLines={1}>
+                      {c.pct.toFixed(0)}%
+                    </Text>
+                  </View>
+                  <SegmentedBar pct={c.pct} color={coffreColors[i % coffreColors.length]} />
+                </Tap>
+              ))}
+            </ScrollView>
+          ) : (
+            <Tap style={styles.coffresEmpty} onPress={() => router.push("/coffres")}>
+              <View style={styles.coffresEmptyIcon}>
+                <Feather name="lock" size={18} color={colors.muted2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.coffresEmptyTitle}>Aucun coffre pour l'instant</Text>
+                <Text style={styles.coffresEmptySub}>Créez-en un pour commencer à épargner</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.muted2} />
+            </Tap>
+          )}
         </View>
 
         <View>
@@ -267,7 +290,7 @@ export default function AccueilScreen() {
         onClose={() => {
           setNotifOpen(false);
           fetchNotifications()
-            .then((n) => setNotifCount(n.length))
+            .then(setNotifs)
             .catch(() => {});
         }}
       />
@@ -290,7 +313,6 @@ function createStyles(colors: ThemeColors) {
   name: { fontFamily: fonts.sansBold, fontSize: 20, color: colors.ink, letterSpacing: -0.3 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   cyclePill: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
-  pulseDot: { width: 8, height: 8, borderRadius: 999, backgroundColor: colors.green },
   cycleLabelSmall: { fontFamily: fonts.sans, fontSize: 9, color: colors.muted2, textTransform: "uppercase", letterSpacing: 0.5 },
   cycleLabel: { fontFamily: fonts.monoBold, fontSize: 12, color: colors.ink },
   bellBtn: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, alignItems: "center", justifyContent: "center" },
@@ -332,6 +354,19 @@ function createStyles(colors: ThemeColors) {
   coffreVal: { fontFamily: fonts.mono, fontSize: 15, color: colors.ink, flexShrink: 1 },
   coffreValMuted: { color: colors.muted2 },
   coffrePct: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.muted },
+  coffresEmpty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    borderRadius: 18,
+    padding: 14,
+  },
+  coffresEmptyIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.fillSoft, alignItems: "center", justifyContent: "center" },
+  coffresEmptyTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.ink },
+  coffresEmptySub: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2, marginTop: 2 },
   actionsGrid: { flexDirection: "row", flexWrap: "wrap", backgroundColor: colors.fillSoft, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 6 },
   actionItem: { width: "25%", alignItems: "center", gap: 8, marginBottom: 10 },
   actionIcon: { width: 54, height: 54, borderRadius: 999, backgroundColor: colors.paper, alignItems: "center", justifyContent: "center" },

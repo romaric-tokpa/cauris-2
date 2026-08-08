@@ -119,7 +119,7 @@ export default function PlusScreen() {
     Alert.alert("Photo de profil", undefined, buttons);
   }
 
-  const gestion: MenuItem[] = [{ label: "FleetOS", icon: "truck", bg: colors.redBg, c: colors.orange, onPress: () => router.push("/fleetos") }];
+  const gestion: MenuItem[] = [{ label: "FleetOS", icon: "truck", bg: colors.orangeBg, c: colors.orange, onPress: () => router.push("/fleetos") }];
   const systeme: MenuItem[] = [
     { label: "Sauvegardes & restauration", icon: "database", bg: colors.blueBg, c: colors.blue, onPress: () => router.push("/sauvegardes") },
     { label: "Réglages", icon: "settings", bg: colors.fillSoft, c: colors.acier, onPress: () => router.push("/reglages") },
@@ -162,11 +162,11 @@ export default function PlusScreen() {
               <View style={styles.cycleStatsRow}>
                 <View>
                   <Text style={styles.cycleStatLabel}>Revenus</Text>
-                  <Text style={[styles.cycleStatVal, { color: "#4ED88F" }]}>{fmt(active.revenu)}</Text>
+                  <Text style={[styles.cycleStatVal, { color: colors.onDarkGreen }]}>{fmt(active.revenu)}</Text>
                 </View>
                 <View>
                   <Text style={styles.cycleStatLabel}>Dépenses</Text>
-                  <Text style={[styles.cycleStatVal, { color: "#FF9E7A" }]}>{fmt(active.depense)}</Text>
+                  <Text style={[styles.cycleStatVal, { color: colors.onDarkRed }]}>{fmt(active.depense)}</Text>
                 </View>
                 <View>
                   <Text style={styles.cycleStatLabel}>Net</Text>

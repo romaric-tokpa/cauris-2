@@ -86,7 +86,7 @@ function createStyles(colors: ThemeColors) {
     shell: { flex: 1, alignItems: "center", justifyContent: "center", padding: 34, backgroundColor: colors.anthracite },
     title: { fontFamily: fonts.sansBold, fontWeight: "800", fontSize: 26, color: "#fff", letterSpacing: -0.5, marginTop: 14 },
     subtitle: { fontFamily: fonts.sans, fontSize: 14, color: "#8A9098", marginTop: 4 },
-    errorText: { fontFamily: fonts.sans, fontSize: 13, color: "#FF9E7A", marginTop: 20, marginBottom: 4, textAlign: "center" },
+    errorText: { fontFamily: fonts.sans, fontSize: 13, color: colors.onDarkRed, marginTop: 20, marginBottom: 4, textAlign: "center" },
     button: { marginTop: 16, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 14, backgroundColor: colors.orange },
     buttonText: { color: "#fff", fontSize: 15, fontFamily: fonts.sansBold },
     logoutText: { fontFamily: fonts.sans, fontSize: 13, color: "#8A9098", textDecorationLine: "underline" },

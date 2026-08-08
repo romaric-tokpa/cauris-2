@@ -1,5 +1,6 @@
 import type { Feather } from "@expo/vector-icons";
 import { apiFetch } from "./api";
+import { currencySymbol } from "./currency";
 import { fmt } from "./format";
 
 export type NotifKind = "budget" | "pret" | "fleetos" | "dette";
@@ -27,7 +28,7 @@ export async function fetchNotifications(): Promise<Notif[]> {
       out.push({
         id: `bud-${r.cat}`,
         title: `Budget ${r.cat} dépassé`,
-        sub: `+${fmt(r.spent - r.budget)} F au-delà du plafond`,
+        sub: `+${fmt(r.spent - r.budget)} ${currencySymbol()} au-delà du plafond`,
         icon: "alert-triangle",
         kind: "budget",
         route: "/budget",
@@ -37,7 +38,7 @@ export async function fetchNotifications(): Promise<Notif[]> {
     out.push({
       id: "pret",
       title: "Échéance prêt étudiant",
-      sub: `${fmt(pret.summary.next.montant)} F à payer avant le ${pret.summary.next.date}`,
+      sub: `${fmt(pret.summary.next.montant)} ${currencySymbol()} à payer avant le ${pret.summary.next.date}`,
       icon: "credit-card",
       kind: "pret",
       route: "/pret",
@@ -47,7 +48,7 @@ export async function fetchNotifications(): Promise<Notif[]> {
     out.push({
       id: "fleetos",
       title: "FleetOS · versement à venir",
-      sub: `${fmt(fleetos.summary.cur.epargne)} F prévus ce mois pour rester dans le plan`,
+      sub: `${fmt(fleetos.summary.cur.epargne)} ${currencySymbol()} prévus ce mois pour rester dans le plan`,
       icon: "truck",
       kind: "fleetos",
       route: "/fleetos",
@@ -59,7 +60,7 @@ export async function fetchNotifications(): Promise<Notif[]> {
       out.push({
         id: `dette-${d.id}`,
         title: `Dette · ${d.nom}`,
-        sub: `${fmt(d.montant)} F à rembourser${d.echeance ? ` · échéance ${d.echeance}` : ""}`,
+        sub: `${fmt(d.montant)} ${currencySymbol()} à rembourser${d.echeance ? ` · échéance ${d.echeance}` : ""}`,
         icon: "alert-circle",
         kind: "dette",
         route: "/coffres",

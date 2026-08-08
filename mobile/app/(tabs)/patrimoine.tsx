@@ -1,10 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AccountLogo from "../../components/AccountLogo";
 import AccountSheet from "../../components/AccountSheet";
+import MultiSegmentedBar from "../../components/MultiSegmentedBar";
 import ScreenFade from "../../components/ScreenFade";
 import Tap from "../../components/Tap";
 import { apiFetch, UnauthorizedError } from "../../lib/api";
@@ -20,12 +21,14 @@ type DashboardResponse = {
   accountGroups: { title: string; subtotal: number; pctOfPatrimoine: number; accounts: { nom: string; solde: number; note?: string }[] }[];
 };
 
-function repartFor(colors: ThemeColors): { title: string; label: string; dot: string; bar: string; key: keyof DashboardResponse["kpis"] }[] {
+type RepartIcon = keyof typeof Feather.glyphMap;
+
+function repartFor(colors: ThemeColors): { title: string; label: string; icon: RepartIcon; color: string; key: keyof DashboardResponse["kpis"] }[] {
   return [
-    { title: "Comptes disponibles", label: "Disponible", dot: colors.ink, bar: "#E7E2D6", key: "disponible" },
-    { title: "Coffres (épargne accessible)", label: "Coffres", dot: colors.blue, bar: colors.blue, key: "coffres" },
-    { title: "Épargne bloquée", label: "Épargne bloquée", dot: colors.acier, bar: colors.acier, key: "bloque" },
-    { title: "Placements", label: "Placements", dot: colors.violet, bar: colors.violet, key: "placement" },
+    { title: "Comptes disponibles", label: "Disponible", icon: "credit-card", color: colors.orange, key: "disponible" },
+    { title: "Coffres (épargne accessible)", label: "Coffres", icon: "archive", color: colors.blue, key: "coffres" },
+    { title: "Épargne bloquée", label: "Épargne bloquée", icon: "lock", color: colors.acier, key: "bloque" },
+    { title: "Placements", label: "Placements", icon: "trending-up", color: colors.violet, key: "placement" },
   ];
 }
 
@@ -37,6 +40,13 @@ function groupAccentFor(colors: ThemeColors): Record<string, string> {
     Placements: colors.violet,
   };
 }
+
+const GROUP_ICON: Record<string, RepartIcon> = {
+  "Comptes disponibles": "credit-card",
+  "Coffres (épargne accessible)": "archive",
+  "Épargne bloquée": "lock",
+  Placements: "trending-up",
+};
 
 const GROUP_TYPE: Record<string, string> = {
   "Comptes disponibles": "disponible",
@@ -116,29 +126,29 @@ export default function PatrimoineScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.anthracite} />}
       >
         <View style={styles.hero}>
-          <Pressable style={styles.heroToggle} onPress={toggleHideAmounts}>
+          <Tap style={styles.heroToggle} onPress={toggleHideAmounts}>
             <Text style={styles.heroLabel}>Patrimoine total</Text>
             <Feather name={hideAmounts ? "eye-off" : "eye"} size={14} color={colors.muted2} />
-          </Pressable>
+          </Tap>
           <Text style={styles.heroValue}>
             {maskAmount(fmt(displayPatrimoine), hideAmounts)} <Text style={styles.heroUnit}>{currencySymbol()}</Text>
           </Text>
-          <View style={styles.repartBar}>
-            {parts.map((p) => (
-              <View key={p.key} style={{ flex: p.val, backgroundColor: p.bar }} />
-            ))}
-          </View>
+          <MultiSegmentedBar parts={parts.map((p) => ({ value: p.val, color: p.color }))} />
         </View>
 
         <View style={styles.repartGrid}>
           {parts.map((p) => (
             <View key={p.key} style={styles.repartTile}>
-              <View style={styles.repartTileHead}>
-                <View style={[styles.dot, { backgroundColor: p.dot }]} />
-                <Text style={styles.repartLabel}>{p.label}</Text>
-                <Text style={styles.repartPct}>{p.pct}%</Text>
+              <View style={[styles.repartIcon, { backgroundColor: p.color + "1A" }]}>
+                <Feather name={p.icon} size={14} color={p.color} />
               </View>
-              <Text style={styles.repartVal}>{maskAmount(fmt(p.val), hideAmounts)}</Text>
+              <View style={styles.repartTileBody}>
+                <View style={styles.repartTileHead}>
+                  <Text style={styles.repartLabel}>{p.label}</Text>
+                  <Text style={styles.repartPct}>{p.pct}%</Text>
+                </View>
+                <Text style={styles.repartVal}>{maskAmount(fmt(p.val), hideAmounts)}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -146,7 +156,10 @@ export default function PatrimoineScreen() {
         <Text style={styles.sectionTitle}>Comptes</Text>
         {accountGroups.map((g) => (
           <View key={g.title} style={styles.acctGroup}>
-            <View style={[styles.acctGroupHead, { borderBottomColor: GROUP_ACCENT[g.title] ?? colors.acier }]}>
+            <View style={styles.acctGroupHead}>
+              <View style={[styles.acctGroupIcon, { backgroundColor: (GROUP_ACCENT[g.title] ?? colors.acier) + "1A" }]}>
+                <Feather name={GROUP_ICON[g.title] ?? "circle"} size={13} color={GROUP_ACCENT[g.title] ?? colors.acier} />
+              </View>
               <Text style={styles.acctGroupTitle}>{g.title}</Text>
               <Text style={styles.acctGroupTotal}>
                 {maskAmount(fmt(g.subtotal), hideAmounts)} {currencySymbol()}
@@ -189,22 +202,44 @@ function createStyles(colors: ThemeColors) {
   addBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: "#fff" },
   content: { paddingHorizontal: 20, paddingBottom: 32, gap: 16 },
   hero: { backgroundColor: colors.anthracite, borderRadius: 24, padding: 22 },
-  heroToggle: { flexDirection: "row", alignItems: "center", gap: 7 },
+  heroToggle: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start" },
   heroLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted2 },
   heroValue: { fontFamily: fonts.monoBold, fontSize: 34, color: "#fff", letterSpacing: -1, marginTop: 6, marginBottom: 18 },
   heroUnit: { fontFamily: fonts.sans, fontSize: 17, color: colors.muted2 },
-  repartBar: { flexDirection: "row", height: 14, borderRadius: 7, overflow: "hidden", gap: 3 },
   repartGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  repartTile: { flexBasis: "48%", flexGrow: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 13 },
-  repartTileHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 },
-  dot: { width: 9, height: 9, borderRadius: 3 },
+  repartTile: {
+    flexBasis: "48%",
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    borderRadius: 16,
+    padding: 13,
+  },
+  repartIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  repartTileBody: { flex: 1, minWidth: 0 },
+  repartTileHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 3 },
   repartLabel: { flex: 1, fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
   repartPct: { fontFamily: fonts.monoBold, fontSize: 11, color: colors.muted2 },
   repartVal: { fontFamily: fonts.monoBold, fontSize: 16, color: colors.ink },
   sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", color: colors.muted2, marginTop: 4 },
   acctGroup: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 18, overflow: "hidden" },
-  acctGroupHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingTop: 12, paddingBottom: 10, backgroundColor: colors.fillSoft, borderBottomWidth: 2 },
-  acctGroupTitle: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.ink },
+  acctGroupHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+    backgroundColor: colors.fillSoft,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.lineSoft,
+  },
+  acctGroupIcon: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  acctGroupTitle: { flex: 1, fontFamily: fonts.sansBold, fontSize: 13, color: colors.ink },
   acctGroupTotal: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.muted },
   acctRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 11, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.lineSoft },
   acctNom: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },

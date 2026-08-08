@@ -1,5 +1,6 @@
+import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import BudgetSheet, { type EditableBudget } from "../components/BudgetSheet";
 import OverlayScreen, { OverlayActionButton } from "../components/OverlayScreen";
 import SegmentedBar from "../components/SegmentedBar";
@@ -10,6 +11,7 @@ import { currencySymbol } from "../lib/currency";
 import { fmt } from "../lib/format";
 import { maskAmount, useColors, usePrefs } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
+import { useCountUp } from "../lib/useCountUp";
 
 type BudgetRow = { cat: string; budget: number; spent: number; pct: number; status: "over" | "at" | "ok" };
 type BudgetResponse = { monthLabel: string; totals: { budget: number; spent: number; restant: number } | null; rows: BudgetRow[]; unbudgeted: { cat: string; spent: number }[] };
@@ -33,6 +35,9 @@ export default function BudgetScreen() {
   const [error, setError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<EditableBudget | null>(null);
+  const displayBudget = useCountUp(data?.totals?.budget ?? 0);
+  const displaySpent = useCountUp(data?.totals?.spent ?? 0);
+  const displayRestant = useCountUp(Math.abs(data?.totals?.restant ?? 0));
 
   const load = useCallback(async () => {
     try {
@@ -79,22 +84,34 @@ export default function BudgetScreen() {
         {data.totals ? (
           <View style={styles.kpiRow}>
             <View style={styles.kpi}>
+              <View style={[styles.kpiIcon, { backgroundColor: colors.fillSoft }]}>
+                <Feather name="target" size={13} color={colors.muted} />
+              </View>
               <Text style={styles.kpiLabel}>Budget total</Text>
-              <Text style={styles.kpiVal}>{maskAmount(fmt(data.totals.budget), hideAmounts)}</Text>
+              <Text style={styles.kpiVal}>{maskAmount(fmt(displayBudget), hideAmounts)}</Text>
             </View>
             <View style={styles.kpi}>
+              <View style={[styles.kpiIcon, { backgroundColor: colors.redBg }]}>
+                <Feather name="arrow-down" size={13} color={colors.red} />
+              </View>
               <Text style={styles.kpiLabel}>Dépensé</Text>
-              <Text style={[styles.kpiVal, { color: colors.red }]}>{maskAmount(fmt(data.totals.spent), hideAmounts)}</Text>
+              <Text style={[styles.kpiVal, { color: colors.red }]}>{maskAmount(fmt(displaySpent), hideAmounts)}</Text>
             </View>
             <View style={styles.kpi}>
+              <View style={[styles.kpiIcon, { backgroundColor: data.totals.restant < 0 ? colors.redBg : colors.greenBg }]}>
+                <Feather name={data.totals.restant < 0 ? "alert-triangle" : "check"} size={13} color={data.totals.restant < 0 ? colors.red : colors.green} />
+              </View>
               <Text style={styles.kpiLabel}>{data.totals.restant < 0 ? "Dépassement" : "Restant"}</Text>
-              <Text style={[styles.kpiVal, { color: colors.green }]}>{maskAmount(fmt(Math.abs(data.totals.restant)), hideAmounts)}</Text>
+              <Text style={[styles.kpiVal, { color: data.totals.restant < 0 ? colors.red : colors.green }]}>{maskAmount(fmt(displayRestant), hideAmounts)}</Text>
             </View>
           </View>
         ) : null}
 
         {data.rows.length === 0 ? (
-          <Text style={styles.empty}>Aucun budget défini pour l&apos;instant. Touchez « + Budget » pour en créer un.</Text>
+          <View style={styles.emptyWrap}>
+            <Feather name="pie-chart" size={26} color={colors.muted2} />
+            <Text style={styles.empty}>Aucun budget défini pour l&apos;instant. Touchez « + Budget » pour en créer un.</Text>
+          </View>
         ) : (
           data.rows.map((r) => (
             <Tap key={r.cat} style={styles.row} onPress={() => openEdit(r)}>
@@ -105,7 +122,7 @@ export default function BudgetScreen() {
                     <Text style={[styles.statusText, { color: STATUS_COLOR[r.status] }]}>{STATUS_LABEL[r.status]}</Text>
                   </View>
                 </View>
-                <Text style={styles.rowPct}>{r.pct.toFixed(0)}%</Text>
+                <Text style={[styles.rowPct, { color: STATUS_COLOR[r.status] }]}>{r.pct.toFixed(0)}%</Text>
               </View>
               <View style={{ marginBottom: 9 }}>
                 <SegmentedBar pct={r.pct} color={STATUS_COLOR[r.status]} />
@@ -129,14 +146,14 @@ export default function BudgetScreen() {
                 <View key={u.cat} style={styles.unbudgetedRow}>
                   <Text style={styles.unbudgetedCat}>{u.cat}</Text>
                   <Text style={styles.unbudgetedAmt}>{maskAmount(fmt(u.spent), hideAmounts)}</Text>
-                  <Pressable
+                  <Tap
                     onPress={() => {
                       setEditing({ cat: u.cat, budget: 0 });
                       setSheetOpen(true);
                     }}
                   >
                     <Text style={styles.unbudgetedDefine}>Définir</Text>
-                  </Pressable>
+                  </Tap>
                 </View>
               ))}
             </View>
@@ -164,9 +181,11 @@ function createStyles(colors: ThemeColors) {
   content: { paddingHorizontal: 18, paddingBottom: 32, gap: 14 },
   kpiRow: { flexDirection: "row", gap: 10 },
   kpi: { flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 13 },
+  kpiIcon: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 8 },
   kpiLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2, marginBottom: 5 },
   kpiVal: { fontFamily: fonts.monoBold, fontSize: 14, color: colors.ink },
-  empty: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: "center", marginTop: 24 },
+  emptyWrap: { alignItems: "center", gap: 10, marginTop: 24 },
+  empty: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: "center" },
   row: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 14 },
   rowHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   rowHeadLeft: { flexDirection: "row", alignItems: "center", gap: 8 },

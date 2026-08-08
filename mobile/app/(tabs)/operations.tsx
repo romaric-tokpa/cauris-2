@@ -85,6 +85,7 @@ export default function OperationsScreen() {
   const [data, setData] = useState<OperationsFeedResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [filter, setFilter] = useState<Filter>("Tous");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<EditableOperation | null>(null);
@@ -192,16 +193,23 @@ export default function OperationsScreen() {
         <OfflineBanner />
       </View>
 
-      <View style={styles.searchRow}>
-        <Feather name="search" size={16} color={colors.muted2} />
+      <View style={[styles.searchRow, searchFocused && styles.searchRowFocus]}>
+        <Feather name="search" size={16} color={searchFocused ? colors.orange : colors.muted2} />
         <TextInput
           style={styles.search}
           placeholder="Rechercher une opération…"
           placeholderTextColor={colors.muted2}
           value={search}
           onChangeText={setSearch}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
           autoCapitalize="none"
         />
+        {search.length > 0 ? (
+          <Pressable onPress={() => setSearch("")} hitSlop={8}>
+            <Feather name="x-circle" size={16} color={colors.muted2} />
+          </Pressable>
+        ) : null}
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filtersContent}>
@@ -210,15 +218,29 @@ export default function OperationsScreen() {
         ))}
       </ScrollView>
 
-      <View style={styles.totalsRow}>
-        <Text style={styles.totalDep}>−{maskAmount(fmt(depTotal), hideAmounts)}</Text>
-        <Text style={styles.totalRev}>+{maskAmount(fmt(revTotal), hideAmounts)}</Text>
-        <Text style={styles.totalCount}>{filtered.length} opérations</Text>
+      <View style={styles.statsCard}>
+        <View style={styles.statsItem}>
+          <Text style={styles.statsLabel}>Dépenses</Text>
+          <Text style={[styles.statsValue, { color: colors.red }]}>−{maskAmount(fmt(depTotal), hideAmounts)}</Text>
+        </View>
+        <View style={styles.statsDivider} />
+        <View style={styles.statsItem}>
+          <Text style={styles.statsLabel}>Revenus</Text>
+          <Text style={[styles.statsValue, { color: colors.green }]}>+{maskAmount(fmt(revTotal), hideAmounts)}</Text>
+        </View>
+        <View style={styles.statsDivider} />
+        <View style={styles.statsItem}>
+          <Text style={styles.statsLabel}>Opérations</Text>
+          <Text style={styles.statsValue}>{filtered.length}</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.list}>
         {groups.length === 0 ? (
-          <Text style={styles.empty}>Aucune opération pour ce filtre.</Text>
+          <View style={styles.emptyWrap}>
+            <Feather name="inbox" size={26} color={colors.muted2} />
+            <Text style={styles.empty}>Aucune opération pour ce filtre.</Text>
+          </View>
         ) : (
           groups.map((g) => (
             <View key={g.day} style={styles.group}>
@@ -304,14 +326,26 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: 14,
   },
   search: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.ink, paddingVertical: 12 },
+  searchRowFocus: { borderColor: colors.orange },
   filters: { marginTop: 12, flexGrow: 0, height: 40 },
   filtersContent: { paddingHorizontal: 20, alignItems: "center" },
-  totalsRow: { flexDirection: "row", gap: 14, paddingHorizontal: 20, marginTop: 10, alignItems: "baseline" },
-  totalDep: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.red },
-  totalRev: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.green },
-  totalCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2 },
+  statsCard: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginTop: 10,
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    borderRadius: 16,
+    paddingVertical: 12,
+  },
+  statsItem: { flex: 1, alignItems: "center", gap: 3 },
+  statsDivider: { width: StyleSheet.hairlineWidth, backgroundColor: colors.lineSoft },
+  statsLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
+  statsValue: { fontFamily: fonts.monoBold, fontSize: 15, color: colors.ink },
   list: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 24 },
-  empty: { textAlign: "center", color: colors.muted, marginTop: 40, fontFamily: fonts.sans, fontSize: 13 },
+  emptyWrap: { alignItems: "center", gap: 10, marginTop: 50 },
+  empty: { textAlign: "center", color: colors.muted, fontFamily: fonts.sans, fontSize: 13 },
   group: { marginBottom: 18 },
   groupHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, paddingHorizontal: 2 },
   groupDay: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink },

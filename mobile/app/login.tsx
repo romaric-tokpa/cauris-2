@@ -3,20 +3,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import Svg, { Ellipse } from "react-native-svg";
+import CauriMark from "../components/CauriMark";
 import { useAuth } from "../lib/AuthContext";
 import { colors, fonts } from "../lib/theme";
-
-function CauriMark({ size = 52 }: { size?: number }) {
-  return (
-    <Svg width={size} height={(size * 66) / 70} viewBox="0 0 70 66">
-      <Ellipse cx={35} cy={52} rx={26} ry={8} fill="#6C737B" />
-      <Ellipse cx={35} cy={40} rx={24} ry={8} fill="#9199A3" />
-      <Ellipse cx={35} cy={28} rx={20} ry={7} fill="#F2C200" />
-      <Ellipse cx={35} cy={17} rx={15} ry={6} fill="#F5F3EF" />
-    </Svg>
-  );
-}
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -107,7 +96,7 @@ const styles = StyleSheet.create({
   inputBoxFocus: { borderColor: colors.orange, backgroundColor: "rgba(226,84,26,0.08)" },
   inputBoxError: { borderColor: colors.red },
   input: { flex: 1, fontFamily: fonts.sans, fontSize: 18, color: "#fff", letterSpacing: 2 },
-  errorText: { fontFamily: fonts.sans, fontSize: 13, color: "#FF9E7A", marginBottom: 12, alignSelf: "flex-start" },
+  errorText: { fontFamily: fonts.sans, fontSize: 13, color: colors.onDarkRed, marginBottom: 12, alignSelf: "flex-start" },
   button: { width: "100%", alignItems: "center", padding: 15, borderRadius: 16, backgroundColor: colors.orange },
   buttonText: { color: "#fff", fontSize: 16, fontFamily: fonts.sansBold },
 });

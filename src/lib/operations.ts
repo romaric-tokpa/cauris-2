@@ -105,7 +105,16 @@ export function appendOperation(seed: SeedData, state: Record<string, unknown>, 
   const now = Date.now();
   const hhmm = new Date(now).toTimeString().slice(0, 5);
 
-  const op: Operation = { date, lib, type, compte, cat: type === "virement" ? "" : input.cat, montant, note: input.note };
+  const op: Operation = {
+    date,
+    lib,
+    type,
+    compte,
+    compteDest: type === "virement" ? compteDest : undefined,
+    cat: type === "virement" ? "" : input.cat,
+    montant,
+    note: input.note,
+  };
   const newEntries: Operation[] = [];
   if (frais > 0) {
     const gid = `x${now}`;

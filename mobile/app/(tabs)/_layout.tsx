@@ -1,7 +1,18 @@
 import { Feather } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useEffect, useMemo, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  Animated,
+  StyleSheet,
+  Text,
+  View,
+  type AccessibilityRole,
+  type AccessibilityState,
+  type GestureResponderEvent,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import Tap from "../../components/Tap";
 import { useColors } from "../../lib/prefs";
 import { fonts, type ThemeColors } from "../../lib/theme";
 
@@ -16,18 +27,44 @@ function TabIcon({ name, label, focused }: { name: TabIconName; label: string; f
     Animated.spring(anim, { toValue: focused ? 1 : 0, useNativeDriver: true, friction: 7, tension: 60 }).start();
   }, [focused, anim]);
 
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] });
+  const pillScale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] });
+  const iconScale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
 
   return (
     <View style={styles.wrap}>
       <View style={styles.pill}>
-        <Animated.View style={[styles.pillActive, { opacity: anim, transform: [{ scale }] }]} />
-        <Feather name={name} size={20} color={focused ? colors.orange : colors.muted2} style={styles.pillIcon} />
+        <Animated.View style={[styles.pillActive, { opacity: anim, transform: [{ scale: pillScale }] }]} />
+        <Animated.View style={[styles.pillIcon, { transform: [{ scale: iconScale }] }]}>
+          <Feather name={name} size={20} color={focused ? colors.orange : colors.muted2} />
+        </Animated.View>
       </View>
       <Text style={[styles.label, focused && styles.labelActive]}>{label}</Text>
     </View>
   );
 }
+
+type TabButtonProps = {
+  children?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  onPress?: ((e: GestureResponderEvent) => void) | null;
+  onLongPress?: ((e: GestureResponderEvent) => void) | null;
+  accessibilityState?: AccessibilityState;
+  accessibilityRole?: AccessibilityRole;
+  testID?: string;
+};
+
+/** Bouton d'onglet cohérent avec le retour tactile (scale au toucher) utilisé partout ailleurs dans l'app, au lieu du ripple/highlight par défaut de React Navigation. */
+function TabButton({ children, style, ...rest }: TabButtonProps) {
+  return (
+    <Tap style={[style, tabButtonStyle.btn]} {...rest}>
+      {children}
+    </Tap>
+  );
+}
+
+const tabButtonStyle = StyleSheet.create({
+  btn: { alignItems: "center", justifyContent: "center" },
+});
 
 export default function TabsLayout() {
   const colors = useColors();
@@ -40,6 +77,7 @@ export default function TabsLayout() {
         tabBarShowLabel: false,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: { paddingTop: 4 },
+        tabBarButton: TabButton,
       }}
     >
       <Tabs.Screen name="index" options={{ tabBarIcon: ({ focused }) => <TabIcon name="home" label="Accueil" focused={focused} /> }} />
@@ -55,7 +93,7 @@ function createStyles(colors: ThemeColors) {
     tabBar: { backgroundColor: colors.paper, borderTopColor: colors.lineSoft, height: 78, paddingTop: 6 },
     wrap: { alignItems: "center", gap: 4, width: 64 },
     pill: { width: 60, height: 32, borderRadius: 999, alignItems: "center", justifyContent: "center" },
-    pillActive: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 999, backgroundColor: colors.activePill },
+    pillActive: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 999, backgroundColor: colors.orangeBg },
     pillIcon: { zIndex: 1 },
     label: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.muted2 },
     labelActive: { fontFamily: fonts.sansBold, color: colors.ink },

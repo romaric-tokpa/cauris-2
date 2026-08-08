@@ -38,6 +38,7 @@ type Props = {
 };
 
 const TYPE_SIGN: Record<OpType, string> = { dépense: "−", revenu: "+", virement: "⇄" };
+const TYPE_ICON: Record<OpType, keyof typeof Feather.glyphMap> = { dépense: "arrow-down", revenu: "arrow-up", virement: "repeat" };
 
 function defaultDate(mm: string): string {
   const dd = String(new Date().getDate()).padStart(2, "0");
@@ -52,6 +53,9 @@ export default function OperationSheet({ visible, onClose, onSaved, onUnauthoriz
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const TYPE_COLOR: Record<OpType, string> = { dépense: colors.red, revenu: colors.green, virement: colors.ink };
+  // Distinct de TYPE_COLOR : sert de fond de pastille (Chip), donc doit rester une surface sombre lisible avec du
+  // texte blanc dans les deux thèmes — colors.ink devient quasi blanc en thème sombre et y serait illisible.
+  const TYPE_ACCENT: Record<OpType, string> = { dépense: colors.red, revenu: colors.green, virement: colors.anthracite };
   const [type, setType] = useState<OpType>("dépense");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(defaultDate(activeMonthMm));
@@ -176,7 +180,14 @@ export default function OperationSheet({ visible, onClose, onSaved, onUnauthoriz
     <Sheet visible={visible} onClose={onClose} title={editing ? "Modifier l'opération" : isVir ? "Nouveau virement" : type === "revenu" ? "Nouveau revenu" : "Nouvelle dépense"}>
       <ChipScroller>
         {(["dépense", "revenu", "virement"] as OpType[]).map((t) => (
-          <Chip key={t} label={t === "dépense" ? "Dépense" : t === "revenu" ? "Revenu" : "Virement"} active={type === t} onPress={() => setType(t)} accent={colors.orange} />
+          <Chip
+            key={t}
+            label={t === "dépense" ? "Dépense" : t === "revenu" ? "Revenu" : "Virement"}
+            icon={TYPE_ICON[t]}
+            active={type === t}
+            onPress={() => setType(t)}
+            accent={TYPE_ACCENT[t]}
+          />
         ))}
       </ChipScroller>
 
@@ -215,7 +226,10 @@ export default function OperationSheet({ visible, onClose, onSaved, onUnauthoriz
 
       {!editing ? (
         <View style={styles.fraisBox}>
-          <View>
+          <View style={styles.fraisIcon}>
+            <Feather name="percent" size={14} color={colors.muted} />
+          </View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.fraisTitle}>Frais de transaction</Text>
             <Text style={styles.fraisSub}>Crée une ligne liée · catégorie Frais</Text>
           </View>
@@ -226,6 +240,9 @@ export default function OperationSheet({ visible, onClose, onSaved, onUnauthoriz
       {!editing && type === "dépense" ? (
         <>
           <View style={styles.detteBox}>
+            <View style={styles.fraisIcon}>
+              <Feather name="corner-down-left" size={14} color={colors.muted} />
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.fraisTitle}>Dette à rembourser</Text>
               <Text style={styles.fraisSub}>L'argent vient d'un coffre — à suivre dans Coffres</Text>
@@ -282,6 +299,7 @@ function createStyles(colors: ThemeColors) {
     alignItems: "center",
     gap: 12,
   },
+  fraisIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.fillSoft, alignItems: "center", justifyContent: "center" },
   fraisTitle: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.ink },
   fraisSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2, marginTop: 2 },
   fraisInput: { width: 100, marginBottom: 0 },

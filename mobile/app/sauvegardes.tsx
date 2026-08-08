@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import OverlayScreen from "../components/OverlayScreen";
+import Tap from "../components/Tap";
 import { apiFetch, UnauthorizedError } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { useColors } from "../lib/prefs";
@@ -130,25 +131,44 @@ export default function SauvegardesScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.statsRow}>
           <View style={styles.stat}>
-            <Text style={styles.statLabel}>Sauvegardes</Text>
+            <View style={styles.statHead}>
+              <Text style={styles.statLabel}>Sauvegardes</Text>
+              <Feather name="archive" size={12} color={colors.muted2} />
+            </View>
             <Text style={styles.statVal}>{backups.length}</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statLabel}>Dernière</Text>
+            <View style={styles.statHead}>
+              <Text style={styles.statLabel}>Dernière</Text>
+              <Feather name="clock" size={12} color={colors.muted2} />
+            </View>
             <Text style={styles.statVal}>{backups[0] ? timeAgo(backups[0].created_at) : "—"}</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statLabel}>Espace</Text>
+            <View style={styles.statHead}>
+              <Text style={styles.statLabel}>Espace</Text>
+              <Feather name="hard-drive" size={12} color={colors.muted2} />
+            </View>
             <Text style={styles.statVal}>{formatBytes(totalBytes)}</Text>
           </View>
         </View>
 
-        <Pressable style={styles.backupBtn} onPress={handleBackupNow} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.backupBtnText}>Sauvegarder maintenant</Text>}
-        </Pressable>
+        <Tap style={styles.backupBtn} onPress={handleBackupNow} disabled={saving}>
+          {saving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Feather name="save" size={16} color="#fff" />
+              <Text style={styles.backupBtnText}>Sauvegarder maintenant</Text>
+            </>
+          )}
+        </Tap>
 
         {backups.length === 0 ? (
-          <Text style={styles.empty}>Aucune sauvegarde pour l&apos;instant.</Text>
+          <View style={styles.emptyWrap}>
+            <Feather name="archive" size={26} color={colors.muted2} />
+            <Text style={styles.empty}>Aucune sauvegarde pour l&apos;instant.</Text>
+          </View>
         ) : (
           <View style={styles.card}>
             {backups.map((b) => {
@@ -164,9 +184,9 @@ export default function SauvegardesScreen() {
                       {formatDate(b.created_at)} · {formatBytes(b.bytes)} · {b.cycles} cycle{b.cycles > 1 ? "s" : ""}
                     </Text>
                   </View>
-                  <Pressable style={styles.restoreBtn} onPress={() => confirmRestore(b)} disabled={restoringId === b.id}>
+                  <Tap style={styles.restoreBtn} onPress={() => confirmRestore(b)} disabled={restoringId === b.id}>
                     {restoringId === b.id ? <ActivityIndicator size="small" color={colors.orange} /> : <Text style={styles.restoreBtnText}>Restaurer</Text>}
-                  </Pressable>
+                  </Tap>
                 </View>
               );
             })}
@@ -183,11 +203,13 @@ function createStyles(colors: ThemeColors) {
   content: { paddingHorizontal: 18, paddingBottom: 32, gap: 14 },
   statsRow: { flexDirection: "row", gap: 10 },
   stat: { flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 13 },
-  statLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2, marginBottom: 5 },
+  statHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 5 },
+  statLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
   statVal: { fontFamily: fonts.monoBold, fontSize: 14, color: colors.ink },
-  backupBtn: { alignItems: "center", padding: 14, borderRadius: 16, backgroundColor: colors.anthracite },
+  backupBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 16, backgroundColor: colors.anthracite },
   backupBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: "#fff" },
-  empty: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: "center", marginTop: 20 },
+  emptyWrap: { alignItems: "center", gap: 10, marginTop: 20 },
+  empty: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: "center" },
   card: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 18, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },
   rowIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },

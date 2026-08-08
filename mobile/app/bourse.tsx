@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import BourseTradeSheet from "../components/BourseTradeSheet";
@@ -111,36 +112,57 @@ export default function BourseScreen() {
           <Text style={styles.heroValue}>
             {fmt(displayValorisation)} <Text style={styles.heroUnit}>{currencySymbol()}</Text>
           </Text>
-          <Text style={[styles.heroPl, { color: plColor }]}>
-            {up ? "+" : "−"}
-            {fmt(Math.abs(data.plusValue))} · {up ? "+" : "−"}
-            {Math.abs(data.plusValuePct).toFixed(1)}%
-          </Text>
+          <View style={[styles.heroPl, { backgroundColor: up ? colors.greenBg : colors.redBg }]}>
+            <Feather name={up ? "trending-up" : "trending-down"} size={12} color={plColor} />
+            <Text style={[styles.heroPlText, { color: plColor }]}>
+              {up ? "+" : "−"}
+              {fmt(Math.abs(data.plusValue))} · {up ? "+" : "−"}
+              {Math.abs(data.plusValuePct).toFixed(1)}%
+            </Text>
+          </View>
         </View>
 
         <View style={styles.kpiRow}>
           <View style={styles.kpi}>
-            <Text style={styles.kpiLabel}>Investi</Text>
+            <View style={styles.kpiHead}>
+              <Text style={styles.kpiLabel}>Investi</Text>
+              <View style={[styles.kpiIcon, { backgroundColor: colors.fillSoft }]}>
+                <Feather name="briefcase" size={12} color={colors.muted} />
+              </View>
+            </View>
             <Text style={styles.kpiVal}>{fmt(data.investi)}</Text>
           </View>
           <View style={styles.kpi}>
-            <Text style={styles.kpiLabel}>Dividendes</Text>
+            <View style={styles.kpiHead}>
+              <Text style={styles.kpiLabel}>Dividendes</Text>
+              <View style={[styles.kpiIcon, { backgroundColor: colors.greenBg }]}>
+                <Feather name="gift" size={12} color={colors.green} />
+              </View>
+            </View>
             <Text style={[styles.kpiVal, { color: colors.green }]}>{fmt(data.dividendes)}</Text>
           </View>
           <View style={styles.kpi}>
-            <Text style={styles.kpiLabel}>Liquidités</Text>
+            <View style={styles.kpiHead}>
+              <Text style={styles.kpiLabel}>Liquidités</Text>
+              <View style={[styles.kpiIcon, { backgroundColor: colors.blueBg }]}>
+                <Feather name="credit-card" size={12} color={colors.blue} />
+              </View>
+            </View>
             <Text style={styles.kpiVal}>{fmt(data.liquidites)}</Text>
           </View>
         </View>
 
         <View style={styles.tradeRow}>
           <Tap style={styles.tradePrimary} onPress={() => openTrade("achat")}>
+            <Feather name="plus" size={15} color="#fff" />
             <Text style={styles.tradePrimaryText}>Achat</Text>
           </Tap>
           <Tap style={styles.tradeSecondary} onPress={() => openTrade("vente")}>
+            <Feather name="minus" size={15} color={colors.ink} />
             <Text style={styles.tradeSecondaryText}>Vente</Text>
           </Tap>
           <Tap style={styles.tradeSecondary} onPress={() => openTrade("dividende")}>
+            <Feather name="gift" size={15} color={colors.ink} />
             <Text style={styles.tradeSecondaryText}>Dividende</Text>
           </Tap>
         </View>
@@ -185,7 +207,10 @@ export default function BourseScreen() {
             })}
           </View>
         ) : (
-          <Text style={styles.empty}>Aucune position pour l&apos;instant.</Text>
+          <View style={styles.emptyWrap}>
+            <Feather name="trending-up" size={26} color={colors.muted2} />
+            <Text style={styles.empty}>Aucune position pour l&apos;instant.</Text>
+          </View>
         )}
 
         <Text style={styles.sectionTitle}>Historique</Text>
@@ -215,7 +240,10 @@ export default function BourseScreen() {
             })}
           </View>
         ) : (
-          <Text style={styles.empty}>Aucune opération boursière pour l&apos;instant.</Text>
+          <View style={styles.emptyWrap}>
+            <Feather name="clock" size={26} color={colors.muted2} />
+            <Text style={styles.empty}>Aucune opération boursière pour l&apos;instant.</Text>
+          </View>
         )}
       </ScrollView>
 
@@ -245,21 +273,25 @@ function createStyles(colors: ThemeColors) {
   heroLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted2 },
   heroValue: { fontFamily: fonts.monoBold, fontSize: 28, color: colors.ink, letterSpacing: -1, marginTop: 2, marginBottom: 4 },
   heroUnit: { fontFamily: fonts.sans, fontSize: 15, color: colors.muted },
-  heroPl: { fontFamily: fonts.monoBold, fontSize: 14 },
+  heroPl: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  heroPlText: { fontFamily: fonts.monoBold, fontSize: 12 },
   kpiRow: { flexDirection: "row", gap: 10 },
   kpi: { flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 12 },
-  kpiLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2, marginBottom: 4 },
+  kpiHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 4 },
+  kpiIcon: { width: 20, height: 20, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  kpiLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
   kpiVal: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.ink },
   tradeRow: { flexDirection: "row", gap: 8 },
-  tradePrimary: { flex: 1, alignItems: "center", padding: 12, borderRadius: 14, backgroundColor: colors.anthracite },
+  tradePrimary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, padding: 12, borderRadius: 14, backgroundColor: colors.anthracite },
   tradePrimaryText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: "#fff" },
-  tradeSecondary: { flex: 1, alignItems: "center", padding: 12, borderRadius: 14, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft },
+  tradeSecondary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, padding: 12, borderRadius: 14, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft },
   tradeSecondaryText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.ink },
   sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", color: colors.muted2, marginBottom: 6 },
   card: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 18, overflow: "hidden" },
   trendCard: { padding: 16 },
   trendCardTitle: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.ink, marginBottom: 10 },
-  empty: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
+  emptyWrap: { alignItems: "center", gap: 10, marginTop: 10 },
+  empty: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: "center" },
   posRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },
   posBadge: { width: 40, height: 40, borderRadius: 11, backgroundColor: colors.violetBg, alignItems: "center", justifyContent: "center" },
   posBadgeText: { fontFamily: fonts.sansBold, fontSize: 11, color: colors.violet },

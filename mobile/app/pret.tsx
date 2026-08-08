@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import OverlayScreen from "../components/OverlayScreen";
@@ -9,6 +10,7 @@ import { currencySymbol } from "../lib/currency";
 import { fmt } from "../lib/format";
 import { useColors } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
+import { useCountUp } from "../lib/useCountUp";
 
 type PretEcheance = { no: number; date: string; capital: number; interets: number; assurance: number; montant: number; reste: number; paid: boolean; linked: boolean; current: boolean };
 type PretResponse = {
@@ -24,6 +26,7 @@ export default function PretScreen() {
   const [data, setData] = useState<PretResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyNo, setBusyNo] = useState<number | null>(null);
+  const displayResteDu = useCountUp(data?.summary.resteDu ?? 0);
 
   const load = useCallback(async () => {
     try {
@@ -85,7 +88,7 @@ export default function PretScreen() {
             <View>
               <Text style={styles.metaLabel}>Capital restant dû</Text>
               <Text style={styles.metaValue}>
-                {fmt(summary.resteDu)} {currencySymbol()}
+                {fmt(displayResteDu)} {currencySymbol()}
               </Text>
             </View>
             <View>
@@ -97,11 +100,21 @@ export default function PretScreen() {
 
         <View style={styles.kpiRow}>
           <View style={styles.kpi}>
-            <Text style={styles.kpiLabel}>Capital remboursé</Text>
+            <View style={styles.kpiHead}>
+              <Text style={styles.kpiLabel}>Capital remboursé</Text>
+              <View style={[styles.kpiIcon, { backgroundColor: colors.greenBg }]}>
+                <Feather name="trending-down" size={13} color={colors.green} />
+              </View>
+            </View>
             <Text style={styles.kpiVal}>{fmt(summary.rembourse)}</Text>
           </View>
           <View style={styles.kpi}>
-            <Text style={styles.kpiLabel}>Échéances</Text>
+            <View style={styles.kpiHead}>
+              <Text style={styles.kpiLabel}>Échéances</Text>
+              <View style={[styles.kpiIcon, { backgroundColor: colors.blueBg }]}>
+                <Feather name="calendar" size={13} color={colors.blue} />
+              </View>
+            </View>
             <Text style={styles.kpiVal}>
               {summary.payees} / {info.nbEcheances}
             </Text>
@@ -112,10 +125,19 @@ export default function PretScreen() {
         {aVenir.length ? (
           <View style={styles.card}>
             {aVenir.map((e) => (
-              <View key={e.no} style={[styles.echRow, e.current && { backgroundColor: colors.fillSoft }]}>
-                <Text style={styles.echNo}>#{e.no}</Text>
+              <View key={e.no} style={[styles.echRow, e.current && styles.echRowCurrent]}>
+                <View style={[styles.echIcon, { backgroundColor: e.current ? colors.amberBg : colors.fillSoft }]}>
+                  <Feather name={e.current ? "clock" : "calendar"} size={14} color={e.current ? colors.amber : colors.muted2} />
+                </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.echDate}>{e.date}</Text>
+                  <View style={styles.echDateRow}>
+                    <Text style={styles.echDate}>#{e.no} · {e.date}</Text>
+                    {e.current ? (
+                      <View style={styles.echNextPill}>
+                        <Text style={styles.echNextPillText}>Prochaine</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={styles.echMeta}>
                     cap {fmt(e.capital)} · int {fmt(e.interets)} · assur {fmt(e.assurance)}
                   </Text>
@@ -131,7 +153,10 @@ export default function PretScreen() {
             ))}
           </View>
         ) : (
-          <Text style={styles.empty}>Prêt entièrement soldé.</Text>
+          <View style={styles.emptyWrap}>
+            <Feather name="check-circle" size={26} color={colors.green} />
+            <Text style={styles.empty}>Prêt entièrement soldé.</Text>
+          </View>
         )}
 
         <Text style={styles.sectionTitle}>Échéances payées · {payees.length}</Text>
@@ -139,9 +164,11 @@ export default function PretScreen() {
           <View style={styles.card}>
             {payees.map((e) => (
               <View key={e.no} style={styles.echRow}>
-                <Text style={styles.echNo}>#{e.no}</Text>
+                <View style={[styles.echIcon, { backgroundColor: colors.greenBg }]}>
+                  <Feather name="check" size={14} color={colors.green} />
+                </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.echDate}>{e.date}</Text>
+                  <Text style={styles.echDate}>#{e.no} · {e.date}</Text>
                   <Text style={styles.echMeta}>
                     cap {fmt(e.capital)} · int {fmt(e.interets)} · assur {fmt(e.assurance)}
                   </Text>
@@ -154,7 +181,10 @@ export default function PretScreen() {
             ))}
           </View>
         ) : (
-          <Text style={styles.empty}>Aucune échéance payée pour l&apos;instant.</Text>
+          <View style={styles.emptyWrap}>
+            <Feather name="calendar" size={26} color={colors.muted2} />
+            <Text style={styles.empty}>Aucune échéance payée pour l&apos;instant.</Text>
+          </View>
         )}
       </ScrollView>
     </OverlayScreen>
@@ -171,18 +201,25 @@ function createStyles(colors: ThemeColors) {
   metaValue: { fontFamily: fonts.monoBold, fontSize: 17, color: colors.ink, marginTop: 2 },
   kpiRow: { flexDirection: "row", gap: 10 },
   kpi: { flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 16, padding: 13 },
-  kpiLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2, marginBottom: 5 },
+  kpiHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 },
+  kpiIcon: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  kpiLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
   kpiVal: { fontFamily: fonts.monoBold, fontSize: 15, color: colors.ink },
   sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", color: colors.muted2, marginBottom: 6 },
   card: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 18, overflow: "hidden" },
-  echRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },
-  echNo: { fontFamily: fonts.monoBold, fontSize: 12, color: colors.muted2, width: 28 },
+  echRow: { flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },
+  echRowCurrent: { backgroundColor: colors.fillSoft },
+  echIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  echDateRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   echDate: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.ink },
+  echNextPill: { backgroundColor: colors.amberBg, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+  echNextPillText: { fontFamily: fonts.sansSemiBold, fontSize: 9, color: colors.amber, textTransform: "uppercase", letterSpacing: 0.3 },
   echMeta: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.muted2, marginTop: 1 },
   echTotal: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.ink },
   echStat: { fontFamily: fonts.sansSemiBold, fontSize: 10, marginTop: 2 },
   echBtn: { backgroundColor: colors.orange, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, minWidth: 60, alignItems: "center" },
   echBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 11, color: "#fff" },
-  empty: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
+  emptyWrap: { alignItems: "center", gap: 10, marginTop: 10 },
+  empty: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: "center" },
   });
 }

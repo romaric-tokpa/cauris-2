@@ -5,15 +5,15 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, AppState, type AppStateStatus, View } from "react-native";
+import { AppState, type AppStateStatus } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import BiometricGate from "../components/BiometricGate";
+import LoadingScreen from "../components/LoadingScreen";
 import { AuthProvider, useAuth } from "../lib/AuthContext";
 import { useIsOnline } from "../lib/network";
 import { syncQueue } from "../lib/offlineQueue";
 import { PrefsProvider, useColors, usePrefs } from "../lib/prefs";
 import { ProfileProvider } from "../lib/ProfileContext";
-import { colors as staticColors } from "../lib/theme";
 
 /** Verrouille de nouveau si l'app est restée en arrière-plan au moins ce délai. */
 const IDLE_LOCK_MS = 60 * 1000;
@@ -54,11 +54,7 @@ function RootNavigator() {
   }, []);
 
   if (loading || !prefsLoaded) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.desk }}>
-        <ActivityIndicator color={colors.anthracite} />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   if (isLoggedIn && biometric && !unlocked) {
@@ -99,11 +95,7 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: staticColors.desk }}>
-        <ActivityIndicator color={staticColors.anthracite} />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   return (

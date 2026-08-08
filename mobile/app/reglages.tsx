@@ -2,16 +2,17 @@ import { Feather } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import OverlayScreen from "../components/OverlayScreen";
 import PasswordSheet from "../components/PasswordSheet";
 import SwitchToggle from "../components/Switch";
+import Tap from "../components/Tap";
 import type { Currency } from "../lib/currency";
 import { useAuth } from "../lib/AuthContext";
 import { useColors, usePrefs } from "../lib/prefs";
 import { fonts, type ThemeColors } from "../lib/theme";
 
-const APP_VERSION = "2.0";
+const APP_VERSION = "2.1.0";
 
 const CURRENCIES: { value: Currency; label: string }[] = [
   { value: "XOF", label: "FCFA" },
@@ -47,12 +48,18 @@ export default function ReglagesScreen() {
         <View>
           <Text style={styles.sectionTitle}>Sécurité</Text>
           <View style={styles.card}>
-            <Pressable style={styles.row} onPress={() => setPwdOpen(true)}>
-              <Text style={styles.rowLabel}>Changer le mot de passe</Text>
+            <Tap style={styles.row} onPress={() => setPwdOpen(true)}>
+              <View style={[styles.rowIcon, { backgroundColor: colors.blueBg }]}>
+                <Feather name="lock" size={16} color={colors.blue} />
+              </View>
+              <Text style={[styles.rowLabel, { flex: 1 }]}>Changer le mot de passe</Text>
               <Feather name="chevron-right" size={18} color={colors.muted2} />
-            </Pressable>
+            </Tap>
             <View style={[styles.row, styles.rowLast]}>
-              <Text style={styles.rowLabel}>Déverrouillage biométrique</Text>
+              <View style={[styles.rowIcon, { backgroundColor: colors.greenBg }]}>
+                <Feather name="shield" size={16} color={colors.green} />
+              </View>
+              <Text style={[styles.rowLabel, { flex: 1 }]}>Déverrouillage biométrique</Text>
               <SwitchToggle value={biometric} onValueChange={onToggleBiometric} />
             </View>
           </View>
@@ -62,38 +69,56 @@ export default function ReglagesScreen() {
           <Text style={styles.sectionTitle}>Préférences</Text>
           <View style={styles.card}>
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Mode sombre</Text>
+              <View style={[styles.rowIcon, { backgroundColor: colors.fillSoft }]}>
+                <Feather name={dark ? "moon" : "sun"} size={16} color={colors.acier} />
+              </View>
+              <Text style={[styles.rowLabel, { flex: 1 }]}>Mode sombre</Text>
               <SwitchToggle value={dark} onValueChange={toggleDark} />
             </View>
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Masquer les montants</Text>
+              <View style={[styles.rowIcon, { backgroundColor: colors.fillSoft }]}>
+                <Feather name="eye-off" size={16} color={colors.acier} />
+              </View>
+              <Text style={[styles.rowLabel, { flex: 1 }]}>Masquer les montants</Text>
               <SwitchToggle value={hideAmounts} onValueChange={toggleHideAmounts} />
             </View>
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Devise</Text>
+              <View style={[styles.rowIcon, { backgroundColor: colors.violetBg }]}>
+                <Feather name="dollar-sign" size={16} color={colors.violet} />
+              </View>
+              <Text style={[styles.rowLabel, { flex: 1 }]}>Devise</Text>
               <View style={styles.currencyGroup}>
                 {CURRENCIES.map((c) => (
-                  <Pressable key={c.value} style={[styles.currencyPill, currency === c.value && styles.currencyPillActive]} onPress={() => setCurrency(c.value)}>
+                  <Tap key={c.value} style={[styles.currencyPill, currency === c.value && styles.currencyPillActive]} onPress={() => setCurrency(c.value)}>
                     <Text style={[styles.currencyPillText, currency === c.value && styles.currencyPillTextActive]}>{c.label}</Text>
-                  </Pressable>
+                  </Tap>
                 ))}
               </View>
             </View>
-            <Pressable style={[styles.row, styles.rowLast]} onPress={() => router.push("/sauvegardes")}>
-              <Text style={styles.rowLabel}>Sauvegardes & restauration</Text>
+            <Tap style={[styles.row, styles.rowLast]} onPress={() => router.push("/sauvegardes")}>
+              <View style={[styles.rowIcon, { backgroundColor: colors.blueBg }]}>
+                <Feather name="database" size={16} color={colors.blue} />
+              </View>
+              <Text style={[styles.rowLabel, { flex: 1 }]}>Sauvegardes & restauration</Text>
               <Feather name="chevron-right" size={18} color={colors.muted2} />
-            </Pressable>
+            </Tap>
           </View>
         </View>
 
         <View style={styles.card}>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Version</Text>
+            <View style={[styles.rowIcon, { backgroundColor: colors.fillSoft }]}>
+              <Feather name="info" size={16} color={colors.acier} />
+            </View>
+            <Text style={[styles.rowLabel, { flex: 1 }]}>Version</Text>
             <Text style={styles.rowValueMono}>Cauris {APP_VERSION}</Text>
           </View>
-          <Pressable style={[styles.row, styles.rowLast]} onPress={logout}>
+          <Tap style={[styles.row, styles.rowLast]} onPress={logout}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.redBg }]}>
+              <Feather name="log-out" size={16} color={colors.red} />
+            </View>
             <Text style={[styles.rowLabel, styles.logoutText]}>Déconnexion</Text>
-          </Pressable>
+          </Tap>
         </View>
       </ScrollView>
 
@@ -107,8 +132,9 @@ function createStyles(colors: ThemeColors) {
     content: { paddingHorizontal: 18, paddingBottom: 32, gap: 16 },
     sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", color: colors.muted2, marginBottom: 6 },
     card: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 18, overflow: "hidden" },
-    row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },
+    row: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },
     rowLast: { borderBottomWidth: 0 },
+    rowIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
     rowLabel: { fontFamily: fonts.sans, fontSize: 15, color: colors.ink },
     rowValueMono: { fontFamily: fonts.mono, fontSize: 13, color: colors.muted2 },
     currencyGroup: { flexDirection: "row", gap: 6 },
